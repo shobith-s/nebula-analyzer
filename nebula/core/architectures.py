@@ -12,6 +12,19 @@ class MultiModalEngine(nn.Module):
         self.tabular_encoder = TabNetRegressor(verbose=0)
         print("MultiModalEngine initialized with TabNetRegressor.")
         
+        # --- DEFINITIVE FIX using Forward Hooks ---
+        self.tabular_features_out = None  # A placeholder to store the hook's output
+
+        def hook(model, input, output):
+            """A simple hook function to capture the output of a layer."""
+            # The output of feature_transformer is a tuple (steps_output, M_loss)
+            # We want the steps_output, and specifically the features from the last step.
+            self.tabular_features_out = output[0][:, -1, :]
+
+        # Register the hook on the feature_transformer layer
+        self.tabular_encoder.network.feature_transformer.register_forward_hook(hook)
+        # ---------------------------------------------
+        
         model_name = "distilgpt2"
         self.text_tokenizer = AutoTokenizer.from_pretrained(model_name)
         self.text_encoder = AutoModel.from_pretrained(model_name)
@@ -24,16 +37,12 @@ class MultiModalEngine(nn.Module):
     def forward(self, tabular_data=None, text_data=None):
         encoded_outputs = {}
         if tabular_data is not None:
-            print("Extracting features with trained TabNetRegressor's feature_transformer...")
-            # --- DEFINITIVE FIX ---
-            # 1. Pass data through the initial batch normalization layer
-            processed_x = self.tabular_encoder.network.bn_cont(tabular_data)
-            # 2. Call the feature_transformer directly
-            steps_output, _ = self.tabular_encoder.network.feature_transformer(processed_x)
-            # 3. Take the aggregated features from the last step
-            tabular_features = steps_output[:, -1, :]
-            # --------------------
-            encoded_outputs['tabular'] = tabular_features
+            print("Extracting features with trained TabNetRegressor via hook...")
+            # Perform a regular forward pass. The hook will be triggered automatically.
+            _ = self.tabular_encoder.network(tabular_data)
+            
+            # The hook has now populated self.tabular_features_out with the correct tensor
+            encoded_outputs['tabular'] = self.tabular_features_out
 
         if text_data is not None:
             print("Processing data through Text Transformer encoder...")
