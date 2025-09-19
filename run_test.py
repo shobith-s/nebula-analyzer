@@ -3,39 +3,30 @@ from nebula.core.architectures import NEBULABrain
 
 def test_brain():
     print("--- Starting NEBULA Brain Test ---")
-    
-    # 1. Instantiate the brain
     brain = NEBULABrain()
-    
-    # 2. Create a dummy TRAINING dataset for the MLP
+
     print("\nCreating dummy training data...")
-    X_train = torch.randn(100, 20)  # 100 samples, 20 features
-    # The dummy target must match the MLP's output size (16)
+    X_train = torch.randn(100, 20)
     y_train = torch.randn(100, 16)   
-    
-    # 3. Train the brain
     brain.train(X_tabular=X_train, y_tabular=y_train, epochs=5)
     
-    # 4. Create dummy INFERENCE data
-    print("\nCreating dummy inference data...")
-    dummy_tabular_data = torch.randn(3, 20)
-    print(f"Created dummy tabular data with shape: {dummy_tabular_data.shape}")
-    
-    dummy_text_data = [
-        "What are the key drivers of churn in our premium subscriber base?",
-        "Summarize the performance of the latest marketing campaign.",
-        "Identify anomalies in the transaction logs from the past 24 hours."
-    ]
-    print(f"Created dummy text data with {len(dummy_text_data)} sentences.")
-    
-    # 5. Define a query and run the think process
-    data_payload = {
-        'tabular_data': dummy_tabular_data,
-        'text_data': dummy_text_data
+    # --- Conversation Turn 1 ---
+    print("\nCreating dummy inference data for Turn 1...")
+    data_payload_1 = {
+        'tabular_data': torch.randn(3, 20),
+        'text_data': ["Sales are up in the North.", "Marketing spend was high.", "Customer satisfaction is dropping."]
     }
+    query_1 = "What is the overall summary of the current business state?"
+    brain.think(data_inputs=data_payload_1, query=query_1)
     
-    query = "Find insights combining transactional data and user reports"
-    brain.think(data_inputs=data_payload, query=query)
+    # --- Conversation Turn 2 ---
+    print("\nCreating dummy inference data for Turn 2...")
+    data_payload_2 = {
+        'tabular_data': torch.randn(3, 20),
+        'text_data': ["The new product launch is delayed.", "Competitor X just lowered their prices.", "Logistics costs are increasing."]
+    }
+    query_2 = "Based on my last question, what are the biggest risks now?"
+    brain.think(data_inputs=data_payload_2, query=query_2)
     
     print("\n--- Test Finished ---")
 
