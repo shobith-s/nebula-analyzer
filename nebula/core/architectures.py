@@ -1,30 +1,32 @@
-# In nebula/core/architectures.py
 import torch
 import torch.nn as nn
-import numpy as np  # TabNet works best with NumPy arrays for training
+import numpy as np
 from pytorch_tabnet.tab_model import TabNetRegressor
 from transformers import AutoTokenizer, AutoModel
 from nebula.core.conversation import NeuralConversationEngine
 
 
 class MultiModalEngine(nn.Module):
-    # (This class remains unchanged)
     def __init__(self):
         super().__init__()
         self.tabular_encoder = TabNetRegressor(verbose=0)
         print("MultiModalEngine initialized with TabNetRegressor.")
-        model_name = "distilgpt2"
+        
+        model_name = "distilbert-base-uncased"
         self.text_tokenizer = AutoTokenizer.from_pretrained(model_name)
         self.text_encoder = AutoModel.from_pretrained(model_name)
+        
+        # FIX: Set the padding token if it's not already set
+        if self.text_tokenizer.pad_token is None:
+            self.text_tokenizer.pad_token = self.text_tokenizer.eos_token
+            
         print(f"MultiModalEngine initialized with Text Encoder ({model_name}).")
 
     def forward(self, tabular_data=None, text_data=None):
         encoded_outputs = {}
         if tabular_data is not None:
             print("Extracting features with trained TabNetRegressor...")
-            # For inference, TabNet needs a NumPy array
             tabular_numpy = tabular_data.cpu().numpy()
-            # The .predict method gives the features we need
             tabular_features = self.tabular_encoder.predict(tabular_numpy)
             encoded_outputs['tabular'] = torch.from_numpy(tabular_features)
         if text_data is not None:
@@ -37,7 +39,6 @@ class MultiModalEngine(nn.Module):
 
 
 class NeuralBrainCore(nn.Module):
-    # (This class remains unchanged)
     def __init__(self, text_embed_dim=768, tabular_embed_dim=16, fusion_dim=256, num_heads=8):
         super().__init__()
         print("NeuralBrainCore Initialized with Fusion Layer.")
@@ -61,36 +62,27 @@ class NeuralBrainCore(nn.Module):
 
 
 class NEBULABrain(nn.Module):
-    """
-    The main orchestrator of the deep learning brain.
-    """
     def __init__(self):
         super().__init__()
         self.perception = MultiModalEngine()
         text_dim = self.perception.text_encoder.config.hidden_size
-        # The output of .predict() is just the features n_d + n_a
         tabular_dim = self.perception.tabular_encoder.n_a + self.perception.tabular_encoder.n_d
         self.reasoning = NeuralBrainCore(text_embed_dim=text_dim, tabular_embed_dim=tabular_dim)
         self.conversation = NeuralConversationEngine()
         print("NEBULA Brain Initialized and all core components loaded.")
 
-    # NEW: A method to train the brain's components
     def train(self, X_tabular, y_tabular, epochs=5):
-        """Trains the components of the brain on provided data."""
         print("\n--- Starting Brain Training ---")
         print(f"Training TabNetRegressor for {epochs} epochs...")
-        
-        # TabNet's .fit method handles the training loop for us
         self.perception.tabular_encoder.fit(
             X_train=X_tabular,
             y_train=y_tabular,
             max_epochs=epochs,
-            patience=10 # Stop early if validation loss doesn't improve
+            patience=10
         )
         print("--- Brain Training Finished ---")
 
     def think(self, data_inputs, query):
-        """Processes a dictionary of data inputs and a query to generate an insight."""
         print(f"\n--- New Task ---")
         print(f"Received query: '{query}'")
         perception_output = self.perception.forward(**data_inputs)
