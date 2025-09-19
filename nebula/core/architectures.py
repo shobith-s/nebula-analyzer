@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-from pytorch_tabnet.tab_network import TabNet  # DEFINITIVE FIX: Import from the correct module
+from pytorch_tabnet.tab_network import TabNet
 from transformers import AutoTokenizer, AutoModel
 from nebula.core.conversation import NeuralConversationEngine
 
@@ -9,10 +9,13 @@ class MultiModalEngine(nn.Module):
     def __init__(self, tabular_input_dim, tabular_output_dim):
         super().__init__()
         # --- Tabular Encoder ---
-        # We now instantiate the core TabNet nn.Module directly
         self.tabular_encoder = TabNet(
             input_dim=tabular_input_dim,
             output_dim=tabular_output_dim,
+            # --- FIX: Explicitly tell the model there are no categorical features ---
+            cat_idxs=[],
+            cat_dims=[],
+            # -------------------------------------------------------------------
             n_d=8,
             n_a=8,
             n_steps=3,
@@ -36,7 +39,6 @@ class MultiModalEngine(nn.Module):
         encoded_outputs = {}
         if tabular_data is not None:
             print("Extracting features with TabNet module...")
-            # A clean, direct call to the nn.Module. It returns (features, m_loss)
             tabular_features, _ = self.tabular_encoder(tabular_data)
             encoded_outputs['tabular'] = tabular_features
 
@@ -75,10 +77,9 @@ class NeuralBrainCore(nn.Module):
 class NEBULABrain(nn.Module):
     def __init__(self):
         super().__init__()
-        # Define dimensions explicitly
         TABULAR_INPUT_DIM = 20
-        TABULAR_OUTPUT_DIM = 8 + 8 # n_d + n_a
-        TEXT_DIM = 768 # distilgpt2 hidden size
+        TABULAR_OUTPUT_DIM = 8 + 8 
+        TEXT_DIM = 768 
         
         self.perception = MultiModalEngine(
             tabular_input_dim=TABULAR_INPUT_DIM,
