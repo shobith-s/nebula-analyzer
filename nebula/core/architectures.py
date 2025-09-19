@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-from pytorch_tabnet.tab_model import TabNetModel  # CHANGED: Import the core model
+from pytorch_tabnet.tab_network import TabNet  # DEFINITIVE FIX: Import from the correct module
 from transformers import AutoTokenizer, AutoModel
 from nebula.core.conversation import NeuralConversationEngine
 
@@ -9,8 +9,8 @@ class MultiModalEngine(nn.Module):
     def __init__(self, tabular_input_dim, tabular_output_dim):
         super().__init__()
         # --- Tabular Encoder ---
-        # CHANGED: We now instantiate the core TabNetModel directly
-        self.tabular_encoder = TabNetModel(
+        # We now instantiate the core TabNet nn.Module directly
+        self.tabular_encoder = TabNet(
             input_dim=tabular_input_dim,
             output_dim=tabular_output_dim,
             n_d=8,
@@ -21,7 +21,7 @@ class MultiModalEngine(nn.Module):
             n_shared=2,
             momentum=0.02,
         )
-        print("MultiModalEngine initialized with core TabNetModel.")
+        print("MultiModalEngine initialized with core TabNet module.")
         
         model_name = "distilgpt2"
         self.text_tokenizer = AutoTokenizer.from_pretrained(model_name)
@@ -35,8 +35,8 @@ class MultiModalEngine(nn.Module):
     def forward(self, tabular_data=None, text_data=None):
         encoded_outputs = {}
         if tabular_data is not None:
-            print("Extracting features with TabNetModel...")
-            # CHANGED: A clean, direct call to the model. It returns (features, m_loss)
+            print("Extracting features with TabNet module...")
+            # A clean, direct call to the nn.Module. It returns (features, m_loss)
             tabular_features, _ = self.tabular_encoder(tabular_data)
             encoded_outputs['tabular'] = tabular_features
 
@@ -93,17 +93,14 @@ class NEBULABrain(nn.Module):
 
     def train(self, X_tabular, y_tabular, epochs=5):
         print("\n--- Starting Brain Training ---")
-        print(f"Training TabNetModel for {epochs} epochs...")
+        print(f"Training TabNet module for {epochs} epochs...")
         
-        # --- CHANGED: A standard PyTorch training loop ---
         optimizer = torch.optim.Adam(self.perception.tabular_encoder.parameters())
         loss_fn = nn.MSELoss()
 
         for epoch in range(epochs):
             optimizer.zero_grad()
             features, m_loss = self.perception.tabular_encoder(X_tabular)
-            # This is a simplification; a real implementation would have a regression head
-            # For now, we'll create a dummy loss on the features themselves
             loss = loss_fn(features, y_tabular) + m_loss
             loss.backward()
             optimizer.step()
