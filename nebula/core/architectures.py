@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
-# CHANGED: We now import TabNetRegressor specifically
 from pytorch_tabnet.tab_model import TabNetRegressor
+from transformers import AutoTokenizer, AutoModel
 
 
 class MultiModalEngine(nn.Module):
@@ -9,26 +9,17 @@ class MultiModalEngine(nn.Module):
     Unified understanding across different data types (tabular, text, etc.).
     This will house encoders like TabNet, BERT, and ViT.
     """
-    def __init__(self, tabular_input_dim, tabular_output_dim):
+    def __init__(self):
         super().__init__()
         # --- Tabular Encoder ---
-        # CHANGED: We now instantiate TabNetRegressor
-        self.tabular_encoder = TabNetRegressor(
-            # Note: TabNetRegressor does not use input_dim or output_dim directly.
-            # It infers them during the .fit() call. We will handle this
-            # in a later step when we implement model training.
-            # For now, we initialize it with default values.
-            verbose=0,
-            n_d=8,
-            n_a=8,
-            n_steps=3,
-            gamma=1.3,
-            n_independent=2,
-            n_shared=2,
-            momentum=0.02,
-        )
+        self.tabular_encoder = TabNetRegressor(verbose=0)
         print("MultiModalEngine initialized with TabNetRegressor.")
-        # We will add text and image encoders in future steps
+        
+        # --- Text Encoder ---
+        model_name = "distilbert-base-uncased"
+        self.text_tokenizer = AutoTokenizer.from_pretrained(model_name)
+        self.text_encoder = AutoModel.from_pretrained(model_name)
+        print(f"MultiModalEngine initialized with Text Encoder ({model_name}).")
 
     def forward(self, tabular_data=None, text_data=None):
         """
@@ -38,15 +29,17 @@ class MultiModalEngine(nn.Module):
         
         if tabular_data is not None:
             print("Processing data through TabNetRegressor encoder...")
-            # In prediction mode, TabNetRegressor expects a NumPy array, not a Tensor.
-            # We will handle the full training/prediction logic later.
-            # For this skeleton, we'll just simulate a feature output.
             output_dim = self.tabular_encoder.n_a + self.tabular_encoder.n_d
             simulated_features = torch.randn(tabular_data.shape[0], output_dim)
             encoded_outputs['tabular'] = simulated_features
         
         if text_data is not None:
-            print("Text processing not yet implemented.")
+            print("Processing data through Text Transformer encoder...")
+            inputs = self.text_tokenizer(text_data, return_tensors="pt", padding=True, truncation=True)
+            outputs = self.text_encoder(**inputs)
+            # We use the mean of the last hidden state as the sentence embedding
+            text_features = outputs.last_hidden_state.mean(dim=1)
+            encoded_outputs['text'] = text_features
 
         return encoded_outputs
 
@@ -62,34 +55,38 @@ class NeuralBrainCore(nn.Module):
 
     def forward(self, encoded_data):
         print("Reasoning with NeuralBrainCore...")
+        # We will later implement a fusion layer. For now, we'll just show the shapes.
         if 'tabular' in encoded_data:
-            return encoded_data['tabular']
-        return None
+            print(f"  - Received tabular features of shape: {encoded_data['tabular'].shape}")
+        if 'text' in encoded_data:
+            print(f"  - Received text features of shape: {encoded_data['text'].shape}")
+        
+        # In a real scenario, these features would be combined before returning.
+        # For now, we return a simple confirmation.
+        return "Reasoning complete."
 
 
 class NEBULABrain(nn.Module):
     """
     The main orchestrator of the deep learning brain, integrating all components.
-    It processes data, thinks, learns, and evolves.
     """
     def __init__(self):
         super().__init__()
-        self.perception = MultiModalEngine(
-            tabular_input_dim=20, # Placeholder, not used by TabNetRegressor init
-            tabular_output_dim=5  # Placeholder, not used by TabNetRegressor init
-        )
+        self.perception = MultiModalEngine()
         self.reasoning = NeuralBrainCore()
         print("NEBULA Brain Initialized and all core components loaded.")
 
-    def think(self, data, query):
-        """Processes a query and data to generate an insight."""
+    def think(self, data_inputs, query):
+        """
+        Processes a dictionary of data inputs and a query to generate an insight.
+        """
         print(f"\n--- New Task ---")
         print(f"Received query: '{query}'")
         
-        perception_output = self.perception.forward(tabular_data=data)
+        perception_output = self.perception.forward(**data_inputs)
         
         reasoning_output = self.reasoning.forward(perception_output)
         
-        insight = f"Generated Insight Placeholder (Reasoning Output Shape: {reasoning_output.shape})"
+        insight = f"Generated Insight Placeholder (Reasoning Status: {reasoning_output})"
         print(f"Final Insight: {insight}")
         return insight
