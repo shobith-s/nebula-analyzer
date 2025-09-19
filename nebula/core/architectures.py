@@ -12,11 +12,10 @@ class MultiModalEngine(nn.Module):
         self.tabular_encoder = TabNetRegressor(verbose=0)
         print("MultiModalEngine initialized with TabNetRegressor.")
         
-        model_name = "distilbert-base-uncased"
+        model_name = "distilgpt2"
         self.text_tokenizer = AutoTokenizer.from_pretrained(model_name)
         self.text_encoder = AutoModel.from_pretrained(model_name)
         
-        # FIX: Set the padding token if it's not already set
         if self.text_tokenizer.pad_token is None:
             self.text_tokenizer.pad_token = self.text_tokenizer.eos_token
             
@@ -25,10 +24,17 @@ class MultiModalEngine(nn.Module):
     def forward(self, tabular_data=None, text_data=None):
         encoded_outputs = {}
         if tabular_data is not None:
-            print("Extracting features with trained TabNetRegressor...")
-            tabular_numpy = tabular_data.cpu().numpy()
-            tabular_features = self.tabular_encoder.predict(tabular_numpy)
-            encoded_outputs['tabular'] = torch.from_numpy(tabular_features)
+            print("Extracting features with trained TabNetRegressor's feature_transformer...")
+            # --- DEFINITIVE FIX ---
+            # 1. Pass data through the initial batch normalization layer
+            processed_x = self.tabular_encoder.network.bn_cont(tabular_data)
+            # 2. Call the feature_transformer directly
+            steps_output, _ = self.tabular_encoder.network.feature_transformer(processed_x)
+            # 3. Take the aggregated features from the last step
+            tabular_features = steps_output[:, -1, :]
+            # --------------------
+            encoded_outputs['tabular'] = tabular_features
+
         if text_data is not None:
             print("Processing data through Text Transformer encoder...")
             inputs = self.text_tokenizer(text_data, return_tensors="pt", padding=True, truncation=True)
