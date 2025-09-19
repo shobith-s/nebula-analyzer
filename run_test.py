@@ -7,10 +7,10 @@ def test_brain():
     # 1. Instantiate the brain
     brain = NEBULABrain()
     
-    # 2. Create a dummy TRAINING dataset (now as Tensors)
+    # 2. Create a dummy TRAINING dataset for the MLP
     print("\nCreating dummy training data...")
     X_train = torch.randn(100, 20)  # 100 samples, 20 features
-    # The dummy target must match the feature output size for our simple loss
+    # The dummy target must match the MLP's output size (16)
     y_train = torch.randn(100, 16)   
     
     # 3. Train the brain

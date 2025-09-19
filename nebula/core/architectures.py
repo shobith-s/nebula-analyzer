@@ -1,30 +1,35 @@
 import torch
 import torch.nn as nn
-from pytorch_tabnet.tab_network import TabNet
 from transformers import AutoTokenizer, AutoModel
 from nebula.core.conversation import NeuralConversationEngine
+
+
+# NEW: A simple MLP for tabular data
+class MLP(nn.Module):
+    def __init__(self, input_dim, output_dim):
+        super().__init__()
+        self.layers = nn.Sequential(
+            nn.Linear(input_dim, 64),
+            nn.ReLU(),
+            nn.Linear(64, 32),
+            nn.ReLU(),
+            nn.Linear(32, output_dim)
+        )
+
+    def forward(self, x):
+        return self.layers(x)
 
 
 class MultiModalEngine(nn.Module):
     def __init__(self, tabular_input_dim, tabular_output_dim):
         super().__init__()
         # --- Tabular Encoder ---
-        self.tabular_encoder = TabNet(
+        # CHANGED: Replaced TabNet with our simple MLP
+        self.tabular_encoder = MLP(
             input_dim=tabular_input_dim,
-            output_dim=tabular_output_dim,
-            # --- FIX: Explicitly tell the model there are no categorical features ---
-            cat_idxs=[],
-            cat_dims=[],
-            # -------------------------------------------------------------------
-            n_d=8,
-            n_a=8,
-            n_steps=3,
-            gamma=1.3,
-            n_independent=2,
-            n_shared=2,
-            momentum=0.02,
+            output_dim=tabular_output_dim
         )
-        print("MultiModalEngine initialized with core TabNet module.")
+        print("MultiModalEngine initialized with MLP for tabular data.")
         
         model_name = "distilgpt2"
         self.text_tokenizer = AutoTokenizer.from_pretrained(model_name)
@@ -38,8 +43,9 @@ class MultiModalEngine(nn.Module):
     def forward(self, tabular_data=None, text_data=None):
         encoded_outputs = {}
         if tabular_data is not None:
-            print("Extracting features with TabNet module...")
-            tabular_features, _ = self.tabular_encoder(tabular_data)
+            print("Extracting features with MLP...")
+            # A clean, direct call to our nn.Module
+            tabular_features = self.tabular_encoder(tabular_data)
             encoded_outputs['tabular'] = tabular_features
 
         if text_data is not None:
@@ -77,9 +83,10 @@ class NeuralBrainCore(nn.Module):
 class NEBULABrain(nn.Module):
     def __init__(self):
         super().__init__()
+        # Define dimensions explicitly
         TABULAR_INPUT_DIM = 20
-        TABULAR_OUTPUT_DIM = 8 + 8 
-        TEXT_DIM = 768 
+        TABULAR_OUTPUT_DIM = 16 # Our MLP will output 16 features
+        TEXT_DIM = 768
         
         self.perception = MultiModalEngine(
             tabular_input_dim=TABULAR_INPUT_DIM,
@@ -94,15 +101,16 @@ class NEBULABrain(nn.Module):
 
     def train(self, X_tabular, y_tabular, epochs=5):
         print("\n--- Starting Brain Training ---")
-        print(f"Training TabNet module for {epochs} epochs...")
+        print(f"Training MLP module for {epochs} epochs...")
         
         optimizer = torch.optim.Adam(self.perception.tabular_encoder.parameters())
         loss_fn = nn.MSELoss()
 
         for epoch in range(epochs):
             optimizer.zero_grad()
-            features, m_loss = self.perception.tabular_encoder(X_tabular)
-            loss = loss_fn(features, y_tabular) + m_loss
+            # The forward pass is now just the MLP
+            features = self.perception.tabular_encoder(X_tabular)
+            loss = loss_fn(features, y_tabular)
             loss.backward()
             optimizer.step()
             print(f"Epoch {epoch+1}/{epochs}, Loss: {loss.item():.4f}")
