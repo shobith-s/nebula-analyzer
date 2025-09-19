@@ -1,29 +1,27 @@
 import torch
 import torch.nn as nn
-import numpy as np
-from pytorch_tabnet.tab_model import TabNetRegressor
+from pytorch_tabnet.tab_model import TabNetModel  # CHANGED: Import the core model
 from transformers import AutoTokenizer, AutoModel
 from nebula.core.conversation import NeuralConversationEngine
 
 
 class MultiModalEngine(nn.Module):
-    def __init__(self):
+    def __init__(self, tabular_input_dim, tabular_output_dim):
         super().__init__()
-        self.tabular_encoder = TabNetRegressor(verbose=0)
-        print("MultiModalEngine initialized with TabNetRegressor.")
-        
-        # --- DEFINITIVE FIX using Forward Hooks ---
-        self.tabular_features_out = None  # A placeholder to store the hook's output
-
-        def hook(model, input, output):
-            """A simple hook function to capture the output of a layer."""
-            # The output of feature_transformer is a tuple (steps_output, M_loss)
-            # We want the steps_output, and specifically the features from the last step.
-            self.tabular_features_out = output[0][:, -1, :]
-
-        # Register the hook on the feature_transformer layer
-        self.tabular_encoder.network.feature_transformer.register_forward_hook(hook)
-        # ---------------------------------------------
+        # --- Tabular Encoder ---
+        # CHANGED: We now instantiate the core TabNetModel directly
+        self.tabular_encoder = TabNetModel(
+            input_dim=tabular_input_dim,
+            output_dim=tabular_output_dim,
+            n_d=8,
+            n_a=8,
+            n_steps=3,
+            gamma=1.3,
+            n_independent=2,
+            n_shared=2,
+            momentum=0.02,
+        )
+        print("MultiModalEngine initialized with core TabNetModel.")
         
         model_name = "distilgpt2"
         self.text_tokenizer = AutoTokenizer.from_pretrained(model_name)
@@ -37,12 +35,10 @@ class MultiModalEngine(nn.Module):
     def forward(self, tabular_data=None, text_data=None):
         encoded_outputs = {}
         if tabular_data is not None:
-            print("Extracting features with trained TabNetRegressor via hook...")
-            # Perform a regular forward pass. The hook will be triggered automatically.
-            _ = self.tabular_encoder.network(tabular_data)
-            
-            # The hook has now populated self.tabular_features_out with the correct tensor
-            encoded_outputs['tabular'] = self.tabular_features_out
+            print("Extracting features with TabNetModel...")
+            # CHANGED: A clean, direct call to the model. It returns (features, m_loss)
+            tabular_features, _ = self.tabular_encoder(tabular_data)
+            encoded_outputs['tabular'] = tabular_features
 
         if text_data is not None:
             print("Processing data through Text Transformer encoder...")
@@ -79,22 +75,40 @@ class NeuralBrainCore(nn.Module):
 class NEBULABrain(nn.Module):
     def __init__(self):
         super().__init__()
-        self.perception = MultiModalEngine()
-        text_dim = self.perception.text_encoder.config.hidden_size
-        tabular_dim = self.perception.tabular_encoder.n_a + self.perception.tabular_encoder.n_d
-        self.reasoning = NeuralBrainCore(text_embed_dim=text_dim, tabular_embed_dim=tabular_dim)
+        # Define dimensions explicitly
+        TABULAR_INPUT_DIM = 20
+        TABULAR_OUTPUT_DIM = 8 + 8 # n_d + n_a
+        TEXT_DIM = 768 # distilgpt2 hidden size
+        
+        self.perception = MultiModalEngine(
+            tabular_input_dim=TABULAR_INPUT_DIM,
+            tabular_output_dim=TABULAR_OUTPUT_DIM
+        )
+        self.reasoning = NeuralBrainCore(
+            text_embed_dim=TEXT_DIM,
+            tabular_embed_dim=TABULAR_OUTPUT_DIM
+        )
         self.conversation = NeuralConversationEngine()
         print("NEBULA Brain Initialized and all core components loaded.")
 
     def train(self, X_tabular, y_tabular, epochs=5):
         print("\n--- Starting Brain Training ---")
-        print(f"Training TabNetRegressor for {epochs} epochs...")
-        self.perception.tabular_encoder.fit(
-            X_train=X_tabular,
-            y_train=y_tabular,
-            max_epochs=epochs,
-            patience=10
-        )
+        print(f"Training TabNetModel for {epochs} epochs...")
+        
+        # --- CHANGED: A standard PyTorch training loop ---
+        optimizer = torch.optim.Adam(self.perception.tabular_encoder.parameters())
+        loss_fn = nn.MSELoss()
+
+        for epoch in range(epochs):
+            optimizer.zero_grad()
+            features, m_loss = self.perception.tabular_encoder(X_tabular)
+            # This is a simplification; a real implementation would have a regression head
+            # For now, we'll create a dummy loss on the features themselves
+            loss = loss_fn(features, y_tabular) + m_loss
+            loss.backward()
+            optimizer.step()
+            print(f"Epoch {epoch+1}/{epochs}, Loss: {loss.item():.4f}")
+        
         print("--- Brain Training Finished ---")
 
     def think(self, data_inputs, query):
