@@ -13,7 +13,7 @@ app = FastAPI(
     version="0.2.0"
 )
 
-# ... (CORS middleware remains the same) ...
+# CORS Configuration
 origins = ["http://localhost:5173", "http://127.0.0.1:5173"]
 app.add_middleware(
     CORSMiddleware,
@@ -24,13 +24,21 @@ app.add_middleware(
 )
 
 class AnalysisRequest(BaseModel):
-    tabular_data: List[List[float]] = Field(..., example=[[1.0, 2.5, 3.0, 4.0], [5.0, 6.5, 7.0, 8.0]])
-    query: str = Field(..., example="What are the key patterns in this data?")
+    tabular_data: List[List[float]]
+    query: str
 
-# UPDATED: The response model now includes feature importances
 class AnalysisResponse(BaseModel):
     insight: str
     feature_importances: List[Dict[str, float | str]]
+
+class MemoryResponse(BaseModel):
+    history: List[Dict[str, str]]
+
+# --- SINGLETON BRAIN INSTANCE ---
+# We create one brain when the server starts. We'll reconfigure it for each request.
+# We start with a placeholder input dimension of 1.
+brain = NEBULABrain(tabular_input_dim=1)
+print("Startup complete. NEBULA is ready and waiting for data.")
 
 @app.post("/analyze", response_model=AnalysisResponse)
 def analyze_data(request: AnalysisRequest):
@@ -41,27 +49,27 @@ def analyze_data(request: AnalysisRequest):
         
     num_features = tabular_tensor.shape[1]
     
-    print(f"Creating a new brain for data with {num_features} features.")
-    brain = NEBULABrain(tabular_input_dim=num_features)
+    # Reconfigure the existing brain's MLP for the new data shape
+    # This is more efficient than creating a new brain every time.
+    brain.reconfigure_mlp(num_features)
     
     num_rows = tabular_tensor.shape[0]
     output_dim = 16
     dummy_ytrain = torch.randn(num_rows, output_dim)
     brain.train(X_tabular=tabular_tensor, y_tabular=dummy_ytrain, epochs=2)
     
-    # Get the text insight
     insight = brain.think(tabular_data=tabular_tensor, query=request.query)
-    
-    # Get the feature importances
     importances = brain.get_feature_importances(tabular_data=tabular_tensor)
-    
-    # Format the importances for the frontend chart
-    formatted_importances = [
-        {"name": f"Column {i+1}", "importance": float(imp)} 
-        for i, imp in enumerate(importances)
-    ]
+    formatted_importances = [{"name": f"Column {i+1}", "importance": float(imp)} for i, imp in enumerate(importances)]
     
     return {"insight": insight, "feature_importances": formatted_importances}
+
+# --- NEW: Endpoint to get the brain's memory ---
+@app.get("/memory", response_model=MemoryResponse)
+def get_memory():
+    # Convert the deque to a list of dicts for JSON compatibility
+    history = [{"query": q, "insight": i} for q, i in brain.memory]
+    return {"history": history}
 
 @app.get("/")
 def read_root():
