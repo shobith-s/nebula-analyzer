@@ -5,6 +5,13 @@ import Papa from 'papaparse';
 import './App.css';
 import DataTable from './components/DataTable';
 import DataChart from './components/DataChart';
+import FeatureImportanceChart from './components/FeatureImportanceChart'; // Import the new chart
+
+// Define a type for the feature importance data
+interface ImportanceData {
+  name: string;
+  importance: number;
+}
 
 function App() {
   const [query, setQuery] = useState<string>('');
@@ -12,8 +19,13 @@ function App() {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [tabularData, setTabularData] = useState<number[][] | null>(null);
   const [fileName, setFileName] = useState<string>('');
+  // NEW: State for the feature importance data
+  const [featureImportances, setFeatureImportances] = useState<ImportanceData[] | null>(null);
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    // Reset state on new file upload
+    setInsight('');
+    setFeatureImportances(null);
     const file = event.target.files?.[0];
     if (file) {
       setFileName(file.name);
@@ -24,12 +36,11 @@ function App() {
             .filter(row => row.every(val => !isNaN(val)));
           
           if (numericData.length === 0) {
-            alert("Error: No valid numerical data rows were found in the CSV. Please check the file for text or empty rows.");
+            alert("Error: No valid numerical data rows were found in the CSV.");
             setTabularData(null);
             setFileName('');
             return;
           }
-          
           setTabularData(numericData);
         },
         header: true,
@@ -50,8 +61,8 @@ function App() {
     
     setIsLoading(true);
     setInsight('');
+    setFeatureImportances(null); // Clear previous importances
 
-    // UPDATED: The request data is now simpler
     const requestData = {
       tabular_data: tabularData,
       query: query,
@@ -60,7 +71,11 @@ function App() {
     try {
       const apiUrl = 'http://127.0.0.1:8000/analyze';
       const response = await axios.post(apiUrl, requestData);
+      
+      // Set both the insight and the feature importances from the response
       setInsight(response.data.insight);
+      setFeatureImportances(response.data.feature_importances);
+
     } catch (error) {
       if (axios.isAxiosError(error) && error.response) {
         setInsight(`Error from server: ${error.response.data.detail}`);
@@ -94,10 +109,10 @@ function App() {
         </button>
       </div>
 
-      {tabularData && tabularData.length > 0 && (
+      {/* Render the new Feature Importance chart when data is available */}
+      {featureImportances && (
         <div className="card">
-            <DataChart data={tabularData} />
-            <DataTable data={tabularData} />
+            <FeatureImportanceChart data={featureImportances} />
         </div>
       )}
 
@@ -105,6 +120,13 @@ function App() {
         <div className="card">
           <h2>Insight:</h2>
           <pre>{insight}</pre>
+        </div>
+      )}
+
+      {tabularData && tabularData.length > 0 && (
+        <div className="card">
+            <DataChart data={tabularData} />
+            <DataTable data={tabularData} />
         </div>
       )}
     </div>
