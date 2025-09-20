@@ -1,7 +1,7 @@
-// In frontend/src/components/MainCanvas.tsx
 import { useState } from 'react';
 import axios from 'axios';
 import Papa from 'papaparse';
+import { motion } from 'framer-motion';
 import DataTable from './DataTable';
 import DataChart from './DataChart';
 import FeatureImportanceChart from './FeatureImportanceChart';
@@ -32,10 +32,13 @@ function MainCanvas() {
             .filter(row => row.every(val => !isNaN(val)));
           
           if (numericData.length === 0) {
-            alert("Error: No valid numerical data rows were found in the CSV.");
+            alert("Error: No valid numerical data rows were found in the CSV. Please check the file for text or empty rows.");
             setTabularData(null);
             setFileName('');
             return;
+          }
+          if (numericData.length > 0 && numericData[0].length !== 20) {
+            alert(`Error: The model expects 20 columns. Your file has ${numericData[0].length}. Visualizations will be shown, but analysis may fail.`);
           }
           setTabularData(numericData);
         },
@@ -48,6 +51,10 @@ function MainCanvas() {
   const handleSubmit = async () => {
     if (!tabularData) {
       alert('Please upload a CSV file first.');
+      return;
+    }
+    if (tabularData[0].length !== 20) {
+      alert(`Analysis failed: The model requires exactly 20 columns of data, but your file has ${tabularData[0].length}.`);
       return;
     }
     if (!query.trim()) {
@@ -81,14 +88,19 @@ function MainCanvas() {
     }
   };
 
+  // Define a simple animation for the cards to fade in
+  const cardVariants = {
+    hidden: { opacity: 0, y: 20 },
+    visible: { opacity: 1, y: 0, transition: { duration: 0.5 } },
+  };
+
   return (
     <main className="main-canvas">
-      <div className="card">
+      <motion.div className="card" variants={cardVariants} initial="hidden" animate="visible">
         <label htmlFor="file-upload" className="custom-file-upload">
           {fileName || 'Upload your CSV File'}
         </label>
         <input id="file-upload" type="file" accept=".csv" onChange={handleFileChange} />
-        
         <textarea
           value={query}
           onChange={(e) => setQuery(e.target.value)}
@@ -99,26 +111,26 @@ function MainCanvas() {
         <button onClick={handleSubmit} disabled={isLoading || !tabularData}>
           {isLoading ? 'Thinking...' : 'Get Insight'}
         </button>
-      </div>
+      </motion.div>
 
       {featureImportances && (
-        <div className="card">
+        <motion.div className="card" variants={cardVariants} initial="hidden" animate="visible">
             <FeatureImportanceChart data={featureImportances} />
-        </div>
+        </motion.div>
       )}
 
       {insight && (
-        <div className="card">
+        <motion.div className="card" variants={cardVariants} initial="hidden" animate="visible">
           <h2>Insight:</h2>
           <pre>{insight}</pre>
-        </div>
+        </motion.div>
       )}
 
       {tabularData && tabularData.length > 0 && (
-        <div className="card">
+        <motion.div className="card" variants={cardVariants} initial="hidden" animate="visible">
             <DataChart data={tabularData} />
             <DataTable data={tabularData} />
-        </div>
+        </motion.div>
       )}
     </main>
   );

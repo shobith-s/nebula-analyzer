@@ -133,3 +133,17 @@ th {
 .chart-container {
   color: #888;
 }
+
+/* Glowing Effects for Interactive Elements */
+button,
+textarea,
+.custom-file-upload {
+  transition: box-shadow 0.3s ease-in-out, border-color 0.3s ease-in-out;
+}
+
+button:hover:not(:disabled),
+textarea:hover:not(:disabled),
+.custom-file-upload:hover {
+  border-color: var(--quantum-teal);
+  box-shadow: 0 0 10px 0 var(--quantum-teal);
+}
