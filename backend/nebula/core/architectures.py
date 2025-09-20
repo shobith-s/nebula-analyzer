@@ -1,11 +1,10 @@
-# In backend/nebula/core/architectures.py
-
 import torch
 import torch.nn as nn
 from collections import deque
 from transformers import AutoTokenizer, AutoModel
 from nebula.core.conversation import NeuralConversationEngine
 
+# A simple MLP for tabular data
 class MLP(nn.Module):
     def __init__(self, input_dim, output_dim):
         super().__init__()
@@ -20,10 +19,10 @@ class MLP(nn.Module):
     def forward(self, x):
         return self.layers(x)
 
-
 class MultiModalEngine(nn.Module):
     def __init__(self, tabular_input_dim, tabular_output_dim):
         super().__init__()
+        # --- Tabular Encoder ---
         self.tabular_encoder = MLP(
             input_dim=tabular_input_dim,
             output_dim=tabular_output_dim
@@ -54,7 +53,6 @@ class MultiModalEngine(nn.Module):
             encoded_outputs['text'] = text_features
         return encoded_outputs
 
-
 class NeuralBrainCore(nn.Module):
     def __init__(self, text_embed_dim, tabular_embed_dim, fusion_dim=256, num_heads=8):
         super().__init__()
@@ -77,9 +75,7 @@ class NeuralBrainCore(nn.Module):
         print(f"  - Fused features created with shape: {fused_output.shape}")
         return fused_output
 
-
 class NEBULABrain(nn.Module):
-    # CHANGED: The __init__ method now accepts the tabular data shape
     def __init__(self, tabular_input_dim: int):
         super().__init__()
         self.memory = deque(maxlen=3)

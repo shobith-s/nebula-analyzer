@@ -1,10 +1,9 @@
-// In frontend/src/App.tsx
 import { useState } from 'react';
 import axios from 'axios';
 import Papa from 'papaparse';
 import './App.css';
-import DataTable from './components/DataTable'; // Import DataTable
-import DataChart from './components/DataChart'; // Import DataChart
+import DataTable from './components/DataTable';
+import DataChart from './components/DataChart';
 
 function App() {
   const [query, setQuery] = useState<string>('');
@@ -23,9 +22,13 @@ function App() {
             .map(row => Object.values(row).map(Number))
             .filter(row => row.every(val => !isNaN(val)));
           
-          if (numericData.length > 0 && numericData[0].length !== 20) {
-            alert(`Error: The model expects 20 columns. Your file has ${numericData[0].length}. Visualizations will be shown, but analysis may fail.`);
+          if (numericData.length === 0) {
+            alert("Error: No valid numerical data rows were found in the CSV. Please check the file for text or empty rows.");
+            setTabularData(null);
+            setFileName('');
+            return;
           }
+          
           setTabularData(numericData);
         },
         header: true,
@@ -37,10 +40,6 @@ function App() {
   const handleSubmit = async () => {
     if (!tabularData) {
       alert('Please upload a CSV file first.');
-      return;
-    }
-    if (tabularData[0].length !== 20) {
-      alert(`Analysis failed: The model requires exactly 20 columns of data, but your file has ${tabularData[0].length}.`);
       return;
     }
     if (!query.trim()) {
@@ -94,7 +93,7 @@ function App() {
         </button>
       </div>
 
-      {tabularData && (
+      {tabularData && tabularData.length > 0 && (
         <div className="card">
             <DataChart data={tabularData} />
             <DataTable data={tabularData} />

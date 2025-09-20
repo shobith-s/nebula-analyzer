@@ -1,8 +1,10 @@
-# In nebula/core/conversation.py
 import torch
 from transformers import AutoTokenizer, AutoModelForCausalLM
 
 class NeuralConversationEngine:
+    """
+    Manages dialogue and generates natural language insights.
+    """
     def __init__(self):
         model_name = "distilgpt2"
         self.tokenizer = AutoTokenizer.from_pretrained(model_name)
@@ -14,13 +16,16 @@ class NeuralConversationEngine:
         print(f"NeuralConversationEngine initialized with {model_name}.")
 
     def generate_response(self, query, fused_features, memory_context=""):
+        """
+        Generates a text response based on a query and fused data features.
+        """
         print("Generating response with Conversation Engine...")
         data_summary = f"Data analysis of {fused_features.shape[0]} items resulted in a unified data representation."
 
         prompt = (
             "You are NEBULA, an AI data analyst. Based on the user's query and the data summary, provide a concise insight. "
             "If prior conversation context is provided, use it to inform your response.\n\n"
-            f"{memory_context}"  # Memory will be inserted here
+            f"{memory_context}"
             f"Current Query: {query}\n"
             f"Current Data Summary: {data_summary}\n\n"
             "Generated Insight:"

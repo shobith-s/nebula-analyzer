@@ -1,5 +1,3 @@
-// In frontend/src/components/DataTable.tsx
-
 import React from 'react';
 
 interface DataTableProps {
@@ -17,7 +15,6 @@ const DataTable: React.FC<DataTableProps> = ({ data }) => {
       <table>
         <thead>
           <tr>
-            {/* Create a generic header based on the number of columns */}
             {data[0].map((_, index) => (
               <th key={index}>Column {index + 1}</th>
             ))}
