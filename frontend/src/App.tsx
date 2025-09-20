@@ -1,7 +1,10 @@
+// In frontend/src/App.tsx
 import { useState } from 'react';
 import axios from 'axios';
 import Papa from 'papaparse';
 import './App.css';
+import DataTable from './components/DataTable'; // Import DataTable
+import DataChart from './components/DataChart'; // Import DataChart
 
 function App() {
   const [query, setQuery] = useState<string>('');
@@ -16,22 +19,16 @@ function App() {
       setFileName(file.name);
       Papa.parse(file, {
         complete: (result) => {
-          // result.data is now an array of objects, e.g., [{col1: 'val1', col2: 'val2'}]
-          // We convert it back to an array of arrays with only the numeric values.
           const numericData = (result.data as Record<string, string>[])
             .map(row => Object.values(row).map(Number))
             .filter(row => row.every(val => !isNaN(val)));
           
           if (numericData.length > 0 && numericData[0].length !== 20) {
-            alert(`Error: The CSV file must have exactly 20 numeric columns. Your file has ${numericData[0].length}.`);
-            setTabularData(null);
-            setFileName('');
-            return;
+            alert(`Error: The model expects 20 columns. Your file has ${numericData[0].length}. Visualizations will be shown, but analysis may fail.`);
           }
-
           setTabularData(numericData);
         },
-        header: true, // This tells Papa Parse the first row is a header
+        header: true,
         skipEmptyLines: true,
       });
     }
@@ -40,6 +37,10 @@ function App() {
   const handleSubmit = async () => {
     if (!tabularData) {
       alert('Please upload a CSV file first.');
+      return;
+    }
+    if (tabularData[0].length !== 20) {
+      alert(`Analysis failed: The model requires exactly 20 columns of data, but your file has ${tabularData[0].length}.`);
       return;
     }
     if (!query.trim()) {
@@ -62,7 +63,6 @@ function App() {
       setInsight(response.data.insight);
     } catch (error) {
       if (axios.isAxiosError(error) && error.response) {
-        // If the backend sent a specific error message, display it
         setInsight(`Error from server: ${error.response.data.detail}`);
       } else {
         console.error("Error fetching insight:", error);
@@ -93,6 +93,13 @@ function App() {
           {isLoading ? 'Thinking...' : 'Get Insight'}
         </button>
       </div>
+
+      {tabularData && (
+        <div className="card">
+            <DataChart data={tabularData} />
+            <DataTable data={tabularData} />
+        </div>
+      )}
 
       {insight && (
         <div className="card">
