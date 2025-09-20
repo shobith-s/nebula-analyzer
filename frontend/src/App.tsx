@@ -1,3 +1,4 @@
+// In frontend/src/App.tsx
 import { useState } from 'react';
 import axios from 'axios';
 import Papa from 'papaparse';
@@ -50,9 +51,9 @@ function App() {
     setIsLoading(true);
     setInsight('');
 
+    // UPDATED: The request data is now simpler
     const requestData = {
       tabular_data: tabularData,
-      text_data: ["Sales are trending upwards.", "Customer feedback has been positive."],
       query: query,
     };
 
