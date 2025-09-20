@@ -1,25 +1,78 @@
-#root {
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 2rem;
-  text-align: center;
+/* In frontend/src/App.css */
+.app-container {
+  display: grid;
+  grid-template-columns: 240px 1fr;
+  /* Sidebar width and main content */
+  grid-template-rows: 60px 1fr;
+  /* Header height and main content */
+  grid-template-areas:
+    "header header"
+    "sidebar main";
+  height: 100vh;
+  width: 100vw;
+  background-color: var(--deep-space-black);
 }
 
-.App {
+.header {
+  grid-area: header;
+  padding: 0 1.5rem;
   display: flex;
-  flex-direction: column;
-  gap: 1.5rem;
+  align-items: center;
+  border-bottom: 1px solid #2d3748;
+  /* A subtle border */
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--nebula-purple);
 }
 
-.card {
-  background-color: #242424;
-  padding: 2em;
-  border-radius: 8px;
+.sidebar {
+  grid-area: sidebar;
+  padding: 1.5rem;
+  border-right: 1px solid #2d3748;
   display: flex;
   flex-direction: column;
   gap: 1rem;
 }
 
+.sidebar-link {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  border-radius: 6px;
+  text-decoration: none;
+  color: var(--stellar-white);
+  font-weight: 500;
+  transition: background-color 0.2s ease-in-out;
+}
+
+.sidebar-link:hover {
+  background-color: rgba(129, 140, 248, 0.1);
+  color: var(--nebula-purple);
+}
+
+.main-canvas {
+  grid-area: main;
+  overflow-y: auto;
+  /* Allow scrolling */
+  padding: 2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+/* Keep card styling from before */
+.card {
+  background-color: #1a1a1a;
+  padding: 2em;
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  border: 1px solid #2d3748;
+}
+
+/* ... (other styles like textarea, table, etc. remain the same) ... */
 textarea {
   width: 100%;
   padding: 0.5rem;
@@ -34,32 +87,29 @@ textarea {
 pre {
   white-space: pre-wrap;
   text-align: left;
-  background-color: #1a1a1a;
+  background-color: #242424;
   padding: 1rem;
   border-radius: 6px;
   color: #eee;
 }
 
-/* Custom File Upload Button */
 input[type="file"] {
   display: none;
 }
 
 .custom-file-upload {
-  border: 1px solid #ccc;
+  border: 1px solid #555;
   display: inline-block;
   padding: 6px 12px;
   cursor: pointer;
   background-color: #333;
   border-radius: 6px;
-  border-color: #555;
 }
 
 .custom-file-upload:hover {
   background-color: #444;
 }
 
-/* Table Styling */
 .table-container {
   overflow-x: auto;
 }
@@ -80,8 +130,6 @@ th {
   background-color: #333;
 }
 
-/* Chart Styling */
 .chart-container {
   color: #888;
-  /* Recharts inherits color, so this helps labels */
 }
