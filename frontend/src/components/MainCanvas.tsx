@@ -1,4 +1,3 @@
-// In frontend/src/components/MainCanvas.tsx
 import { useState } from 'react';
 import axios from 'axios';
 import Papa from 'papaparse';
@@ -6,8 +5,8 @@ import { motion } from 'framer-motion';
 import DataTable from './DataTable';
 import DataChart from './DataChart';
 import FeatureImportanceChart from './FeatureImportanceChart';
-import ChatInput from './ChatInput'; // Import new component
-import ChatWindow, { Message } from './ChatWindow'; // Import new component
+import ChatInput from './ChatInput';
+import ChatWindow, { type Message } from './ChatWindow'; // This line is now fixed
 
 interface ImportanceData { name: string; importance: number; }
 
@@ -16,14 +15,12 @@ function MainCanvas() {
   const [tabularData, setTabularData] = useState<number[][] | null>(null);
   const [fileName, setFileName] = useState<string>('');
   const [featureImportances, setFeatureImportances] = useState<ImportanceData[] | null>(null);
-  
-  // NEW: State for managing the conversation history
   const [messages, setMessages] = useState<Message[]>([]);
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
-      setMessages([]); // Clear chat on new file upload
+      setMessages([]);
       setFeatureImportances(null);
       setFileName(file.name);
       Papa.parse(file, {
@@ -44,7 +41,6 @@ function MainCanvas() {
       return;
     }
     
-    // Add user's message to the chat window immediately
     setMessages(prevMessages => [...prevMessages, { sender: 'user', text: query }]);
     setIsLoading(true);
     setFeatureImportances(null);
@@ -58,7 +54,6 @@ function MainCanvas() {
       const apiUrl = 'http://127.0.0.1:8000/analyze';
       const response = await axios.post(apiUrl, requestData);
       
-      // Add AI's response to the chat window
       setMessages(prevMessages => [...prevMessages, { sender: 'ai', text: response.data.insight }]);
       setFeatureImportances(response.data.feature_importances);
 
@@ -85,7 +80,6 @@ function MainCanvas() {
         </label>
         <input id="file-upload" type="file" accept=".csv" onChange={handleFileChange} />
         
-        {/* The new chat interface */}
         <div className="chat-container">
             <ChatWindow messages={messages} />
             <ChatInput onSendMessage={handleSendMessage} isLoading={isLoading} disabled={!tabularData} />
