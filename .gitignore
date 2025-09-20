@@ -1,0 +1,36 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+pip-selfcheck.json
+
+# IDEs and Editors
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.swp
+
+# Secrets
+.env
+secrets.ini
+*.pem
+
+# Datasets - We don't commit large data files
+/data/
+*.csv
+*.json
+*.xls
+*.xlsx
+
+# Model Checkpoints
+/models/
+*.pt
+*.pth
+*.onnx
