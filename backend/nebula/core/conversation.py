@@ -10,13 +10,13 @@ class NeuralConversationEngine:
     def __init__(self):
         load_dotenv()
         self.api_token = os.getenv("HUGGINGFACE_API_TOKEN")
-        # We'll use a powerful, instruction-tuned model from Mistral AI
-        self.model_url = "https://api-inference.huggingface.co/models/mistralai/Mistral-7B-Instruct-v0.2"
+        # CHANGED: Switched to the non-gated Zephyr-7B model
+        self.model_url = "https://api-inference.huggingface.co/models/HuggingFaceH4/zephyr-7b-beta"
         
         if not self.api_token:
             print("HUGGINGFACE_API_TOKEN not found, the AI will not work.")
         else:
-            print(f"NeuralConversationEngine initialized with Hugging Face model: mistralai/Mistral-7B-Instruct-v0.2")
+            print(f"NeuralConversationEngine initialized with Hugging Face model: Zephyr-7B-beta")
 
     def generate_response(self, query, features, **kwargs):
         if not self.api_token:
@@ -49,14 +49,13 @@ class NeuralConversationEngine:
 
         try:
             response = requests.post(self.model_url, headers=headers, json=payload, timeout=60)
-            response.raise_for_status() # Will raise an exception for HTTP error codes
+            response.raise_for_status() 
             
             result = response.json()
             insight = result[0].get('generated_text', '').strip()
             return insight
         except requests.exceptions.RequestException as e:
             print(f"Error during Hugging Face API call: {e}")
-            # Try to parse a more specific error from the response if possible
             try:
                 error_details = e.response.json()
                 return f"Sorry, an error occurred with the Hugging Face API: {error_details.get('error', str(e))}"
