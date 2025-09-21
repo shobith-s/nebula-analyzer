@@ -1,9 +1,8 @@
 import torch
-import torch.nn as nn  # This line was missing
+import torch.nn as nn
 from collections import deque
 from nebula.core.conversation import NeuralConversationEngine
 
-# A simple MLP for tabular data
 class MLP(nn.Module):
     def __init__(self, input_dim, output_dim):
         super().__init__()
@@ -14,7 +13,6 @@ class MLP(nn.Module):
             nn.ReLU(),
             nn.Linear(32, output_dim)
         )
-
     def forward(self, x):
         return self.layers(x)
 
@@ -23,17 +21,24 @@ class NEBULABrain(nn.Module):
         super().__init__()
         self.memory = deque(maxlen=3)
         
-        # Define dimensions dynamically
-        TABULAR_INPUT_DIM = tabular_input_dim
-        TABULAR_OUTPUT_DIM = 16 
+        self.tabular_output_dim = 16
         
-        # The brain now only has a tabular encoder and a conversation engine
         self.tabular_encoder = MLP(
-            input_dim=TABULAR_INPUT_DIM,
-            output_dim=TABULAR_OUTPUT_DIM
+            input_dim=tabular_input_dim,
+            output_dim=self.tabular_output_dim
         )
+        # FIXED: This line was missing
         self.conversation = NeuralConversationEngine()
-        print(f"NEBULA Brain Initialized for Structured Data ({tabular_input_dim} features).")
+        print(f"NEBULABrain Initialized for Structured Data ({tabular_input_dim} features).")
+    
+    def reconfigure_mlp(self, new_input_dim: int):
+        current_input_dim = self.tabular_encoder.layers[0].in_features
+        if new_input_dim != current_input_dim:
+            print(f"Reconfiguring MLP from {current_input_dim} to {new_input_dim} features.")
+            self.tabular_encoder = MLP(
+                input_dim=new_input_dim,
+                output_dim=self.tabular_output_dim
+            )
 
     def train(self, X_tabular, y_tabular, epochs=5):
         print("\n--- Starting Brain Training ---")
@@ -48,10 +53,18 @@ class NEBULABrain(nn.Module):
             loss = loss_fn(features, y_tabular)
             loss.backward()
             optimizer.step()
-            print(f"Epoch {epoch+1}/{epochs}, Loss: {loss.item():.4f}")
-        
         print("--- Brain Training Finished ---")
     
+    def get_feature_importances(self, tabular_data: torch.Tensor):
+        print("Calculating feature importances...")
+        self.tabular_encoder.eval()
+        tabular_data.requires_grad = True
+        features = self.tabular_encoder(tabular_data)
+        features.sum().backward()
+        importances = tabular_data.grad.abs().sum(dim=0)
+        normalized_importances = importances / importances.sum()
+        return normalized_importances.detach().cpu().numpy()
+
     def _get_memory_context(self):
         if not self.memory:
             return ""
@@ -65,7 +78,6 @@ class NEBULABrain(nn.Module):
         print(f"Received query: '{query}'")
         
         memory_context = self._get_memory_context()
-        
         tabular_features = self.tabular_encoder(tabular_data)
         
         insight = self.conversation.generate_response(
@@ -76,6 +88,5 @@ class NEBULABrain(nn.Module):
         )
         
         self.memory.append((query, insight))
-        
         print(f"Final Insight: {insight}")
         return insight
