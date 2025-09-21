@@ -27,7 +27,6 @@ class NEBULABrain(nn.Module):
             input_dim=tabular_input_dim,
             output_dim=self.tabular_output_dim
         )
-        # FIXED: This line was missing
         self.conversation = NeuralConversationEngine()
         print(f"NEBULABrain Initialized for Structured Data ({tabular_input_dim} features).")
     
@@ -53,6 +52,7 @@ class NEBULABrain(nn.Module):
             loss = loss_fn(features, y_tabular)
             loss.backward()
             optimizer.step()
+        print(f"Epoch {epoch+1}/{epochs}, Loss: {loss.item():.4f}")
         print("--- Brain Training Finished ---")
     
     def get_feature_importances(self, tabular_data: torch.Tensor):
@@ -68,12 +68,12 @@ class NEBULABrain(nn.Module):
     def _get_memory_context(self):
         if not self.memory:
             return ""
-        context_str = "Prior Conversation Context:\n"
+        context_str = "Prior Conversation History:\n"
         for q, i in self.memory:
-            context_str += f"- User asked: '{q}'\n- NEBULA answered: '{i}'\n"
+            context_str += f"- The user asked: '{q}'\n- You answered: '{i}'\n"
         return context_str
 
-    def think(self, tabular_data, query, stats_summary=""):
+    def think(self, tabular_data, query, stats_summary="", trend_summary=""):
         print(f"\n--- New Task ---")
         print(f"Received query: '{query}'")
         
@@ -84,7 +84,8 @@ class NEBULABrain(nn.Module):
             query=query, 
             features=tabular_features, 
             memory_context=memory_context, 
-            stats_summary=stats_summary
+            stats_summary=stats_summary,
+            trend_summary=trend_summary
         )
         
         self.memory.append((query, insight))

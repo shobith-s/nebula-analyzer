@@ -4,26 +4,16 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 from typing import List, Dict
 from fastapi.middleware.cors import CORSMiddleware
+from sklearn.linear_model import LinearRegression # New import
 
 from nebula.core.architectures import NEBULABrain
 
-app = FastAPI(
-    title="NEBULA Brain API (Structured Data)",
-    description="An API to interact with the NEBULA reasoning engine for tabular data.",
-    version="0.2.0"
-)
+app = FastAPI(title="NEBULA Brain API (Structured Data)") # Simplified
 
-# CORS Configuration
+# ... (CORS middleware remains the same) ...
 origins = ["http://localhost:5173", "http://127.0.0.1:5173"]
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=origins,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+app.add_middleware(CORSMiddleware, allow_origins=origins, allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 
-# --- DATA MODELS ---
 class AnalysisRequest(BaseModel):
     tabular_data: List[List[float]]
     query: str
@@ -32,34 +22,48 @@ class AnalysisResponse(BaseModel):
     insight: str
     feature_importances: List[Dict[str, float | str]]
 
-# MOVED: The MemoryResponse class is now defined here, before it's used.
 class MemoryResponse(BaseModel):
     history: List[Dict[str, str]]
 
-# The brain is a singleton, initialized once.
 brain = NEBULABrain(tabular_input_dim=1)
 print("Startup complete. NEBULA is ready.")
 
 @app.post("/analyze", response_model=AnalysisResponse)
 def analyze_data(request: AnalysisRequest):
     df = pd.DataFrame(request.tabular_data)
+    
+    # --- MULTI-STEP REASONING ---
+    # 1. Descriptive Statistics
     stats = df.describe()
     stats_summary = stats.to_string()
     
+    # 2. Trend Analysis (Linear Regression)
+    trend_summary = ""
+    if df.shape[1] >= 2:
+        X = df.iloc[:, 0].values.reshape(-1, 1) # First column
+        y = df.iloc[:, 1].values.reshape(-1, 1) # Second column
+        reg = LinearRegression().fit(X, y)
+        slope = reg.coef_[0][0]
+        r_squared = reg.score(X, y)
+        trend_summary = (
+            f"A linear regression between the first two columns was performed. "
+            f"The trend shows a slope of {slope:.2f}, with an R-squared value of {r_squared:.2f}."
+        )
+    # ----------------------------
+
     tabular_tensor = torch.tensor(request.tabular_data).float()
     num_features = tabular_tensor.shape[1]
-    
     brain.reconfigure_mlp(num_features)
     
-    num_rows = tabular_tensor.shape[0]
     output_dim = 16
-    dummy_ytrain = torch.randn(num_rows, output_dim)
+    dummy_ytrain = torch.randn(tabular_tensor.shape[0], output_dim)
     brain.train(X_tabular=tabular_tensor, y_tabular=dummy_ytrain, epochs=2)
     
     insight = brain.think(
         tabular_data=tabular_tensor, 
         query=request.query, 
-        stats_summary=stats_summary
+        stats_summary=stats_summary,
+        trend_summary=trend_summary # Pass the new summary
     )
     
     importances = brain.get_feature_importances(tabular_data=tabular_tensor)
