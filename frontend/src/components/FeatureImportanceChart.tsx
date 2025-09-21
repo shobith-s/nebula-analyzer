@@ -1,11 +1,7 @@
 // In frontend/src/components/FeatureImportanceChart.tsx
 import React from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-
-interface ImportanceData {
-  name: string;
-  importance: number;
-}
+import { type ImportanceData } from '../types'; // Import from new types file
 
 interface FeatureImportanceChartProps {
   data: ImportanceData[];
@@ -16,12 +12,7 @@ const FeatureImportanceChart: React.FC<FeatureImportanceChartProps> = ({ data })
     <div className="chart-container">
       <h3>Feature Importance (XAI)</h3>
       <ResponsiveContainer width="100%" height={300}>
-        <BarChart
-          data={data}
-          layout="vertical"
-          margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
-        >
-          {/* Add a gradient definition */}
+        <BarChart data={data} layout="vertical" margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
           <defs>
             <linearGradient id="auroraGradient" x1="0" y1="0" x2="0" y2="1">
               <stop offset="5%" stopColor="var(--aurora-green)" stopOpacity={0.8}/>

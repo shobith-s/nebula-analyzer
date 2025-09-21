@@ -1,11 +1,7 @@
+// In frontend/src/components/ChatWindow.tsx
 import React, { useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
-
-// FIXED: Added the 'export' keyword here
-export interface Message {
-  sender: 'user' | 'ai';
-  text: string;
-}
+import { type Message } from '../types'; // Import from new types file
 
 interface ChatWindowProps {
   messages: Message[];
