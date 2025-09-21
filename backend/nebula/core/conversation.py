@@ -1,64 +1,64 @@
 import os
-import google.generativeai as genai
+import requests
 from dotenv import load_dotenv
-from transformers import AutoTokenizer, AutoModelForCausalLM
+import json
 
 class NeuralConversationEngine:
     """
-    Manages dialogue and can use either a local model or the Gemini API.
+    Manages dialogue and generates insights using the Hugging Face Inference API.
     """
     def __init__(self):
-        # --- 1. Configure Gemini API ---
-        self.gemini_model = None
-        try:
-            load_dotenv()
-            api_key = os.getenv("GOOGLE_API_KEY")
-            if api_key:
-                genai.configure(api_key=api_key)
-                self.gemini_model = genai.GenerativeModel('gemini-pro')
-                print("NeuralConversationEngine initialized with Google Gemini Pro.")
-            else:
-                print("Gemini API key not found, Gemini model will be unavailable.")
-        except Exception as e:
-            print(f"Error initializing Gemini: {e}")
+        load_dotenv()
+        self.api_token = os.getenv("HUGGINGFACE_API_TOKEN")
+        # We'll use a powerful, instruction-tuned model from Mistral AI
+        self.model_url = "https://api-inference.huggingface.co/models/mistralai/Mistral-7B-Instruct-v0.2"
+        
+        if not self.api_token:
+            print("HUGGINGFACE_API_TOKEN not found, the AI will not work.")
+        else:
+            print(f"NeuralConversationEngine initialized with Hugging Face model: mistralai/Mistral-7B-Instruct-v0.2")
 
-        # --- 2. Load Local Model ---
-        local_model_name = "EleutherAI/gpt-neo-125M"
-        self.local_tokenizer = AutoTokenizer.from_pretrained(local_model_name)
-        self.local_model = AutoModelForCausalLM.from_pretrained(local_model_name)
-        if self.local_tokenizer.pad_token is None:
-            self.local_tokenizer.pad_token = self.local_tokenizer.eos_token
-        print(f"NeuralConversationEngine also initialized with local model: {local_model_name}.")
+    def generate_response(self, query, features, **kwargs):
+        if not self.api_token:
+            return "Error: Hugging Face API token is not configured."
 
-    def generate_response(self, query, features, model_choice="gemini", **kwargs):
+        print("Generating response with Hugging Face Inference API...")
+        
         prompt = (
-            "You are NEBULA, a world-class AI data analyst. Your task is to provide a data-driven insight based on the CURRENT TASK section. Use the Prior Conversation History for context only.\n\n"
-            f"--- Prior Conversation History ---\n{kwargs.get('memory_context', 'None')}\n"
-            "--------------------------------\n\n"
-            "--- CURRENT TASK ---\n"
-            f"Statistical Summary of New Data:\n{kwargs.get('stats_summary', 'Not available.')}\n\n"
-            f"User Query about New Data: {query}\n\n"
+            "You are NEBULA, a world-class AI data analyst. Your task is to provide a data-driven insight. "
+            "You have been provided with a user's query and several pre-computed analyses of their data. "
+            "Synthesize these pieces of information into a single, coherent, human-readable insight.\n\n"
+            f"--- Statistical Summary ---\n{kwargs.get('stats_summary', 'Not available.')}\n\n"
+            f"--- Trend Analysis ---\n{kwargs.get('trend_summary', 'Not available.')}\n\n"
+            f"--- Feature Importance (XAI) Summary ---\n{kwargs.get('xai_summary', 'Not available.')}\n\n"
+            f"--- User Query ---\n{query}\n\n"
             "Generated Insight:"
         )
 
-        if model_choice == "gemini" and self.gemini_model:
-            print("Generating response with Gemini Pro...")
-            try:
-                response = self.gemini_model.generate_content(prompt)
-                return response.text.strip()
-            except Exception as e:
-                print(f"Error during Gemini API call: {e}")
-                return f"Sorry, an error occurred with the Gemini API: {e}"
-        else:
-            print("Generating response with local GPT-Neo model...")
-            inputs = self.local_tokenizer(prompt, return_tensors="pt")
-            output_sequences = self.local_model.generate(
-                input_ids=inputs['input_ids'],
-                attention_mask=inputs['input_ids'].ne(self.local_tokenizer.pad_token_id),
-                max_new_tokens=150,
-                pad_token_id=self.local_tokenizer.pad_token_id,
-                do_sample=True, temperature=0.7, top_k=50,
-            )
-            generated_text = self.local_tokenizer.decode(output_sequences[0], skip_special_tokens=True)
-            insight = generated_text.split("Generated Insight:")[-1].strip()
+        headers = {"Authorization": f"Bearer {self.api_token}"}
+        payload = {
+            "inputs": prompt,
+            "parameters": {
+                "max_new_tokens": 150,
+                "temperature": 0.7,
+                "top_p": 0.95,
+                "do_sample": True,
+                "return_full_text": False
+            }
+        }
+
+        try:
+            response = requests.post(self.model_url, headers=headers, json=payload, timeout=60)
+            response.raise_for_status() # Will raise an exception for HTTP error codes
+            
+            result = response.json()
+            insight = result[0].get('generated_text', '').strip()
             return insight
+        except requests.exceptions.RequestException as e:
+            print(f"Error during Hugging Face API call: {e}")
+            # Try to parse a more specific error from the response if possible
+            try:
+                error_details = e.response.json()
+                return f"Sorry, an error occurred with the Hugging Face API: {error_details.get('error', str(e))}"
+            except:
+                 return f"Sorry, a network error occurred while talking to the Hugging Face API."
