@@ -1,10 +1,53 @@
 /* In frontend/src/App.css */
+@import url('https://fonts.googleapis.com/css2?family=Geist+Sans:wght@400;500;700&family=JetBrains+Mono&display=swap');
+
+:root {
+  --font-sans: 'Geist Sans', sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+
+  --deep-space-black: #0a0a0f;
+  --nebula-purple: #6366f1;
+  --cosmic-blue: #3b82f6;
+  --stellar-white: #f8fafc;
+
+  --aurora-green: #10b981;
+  --solar-orange: #f59e0b;
+  --plasma-pink: #ec4899;
+  --quantum-teal: #06b6d4;
+
+  font-family: var(--font-sans);
+  line-height: 1.5;
+  font-weight: 400;
+
+  color: var(--stellar-white);
+  background-color: var(--deep-space-black);
+
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  margin: 0;
+  display: flex;
+  place-items: center;
+  min-width: 320px;
+  min-height: 100vh;
+}
+
+#root {
+  width: 100%;
+  height: 100vh;
+  margin: 0;
+  padding: 0;
+  max-width: none;
+}
+
 .app-container {
   display: grid;
   grid-template-columns: 240px 1fr;
-  /* Sidebar width and main content */
   grid-template-rows: 60px 1fr;
-  /* Header height and main content */
   grid-template-areas:
     "header header"
     "sidebar main";
@@ -19,16 +62,51 @@
   display: flex;
   align-items: center;
   border-bottom: 1px solid #2d3748;
-  /* A subtle border */
   font-size: 1.25rem;
   font-weight: 700;
   color: var(--nebula-purple);
+  gap: 0.5rem;
 }
+
+.status-indicator {
+  padding: 0.25rem 0.75rem;
+  border-radius: 9999px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  transition: all 0.3s ease-in-out;
+}
+
+.status-indicator.idle {
+  background-color: rgba(59, 130, 246, 0.2);
+  color: var(--cosmic-blue);
+}
+
+.status-indicator.thinking {
+  background-color: rgba(245, 158, 11, 0.2);
+  color: var(--solar-orange);
+}
+
+.status-indicator.success {
+  background-color: rgba(16, 185, 129, 0.2);
+  color: var(--aurora-green);
+}
+
+.status-indicator.error {
+  background-color: rgba(236, 72, 153, 0.2);
+  color: var(--plasma-pink);
+}
+
 
 .sidebar {
   grid-area: sidebar;
   padding: 1.5rem;
   border-right: 1px solid #2d3748;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.sidebar-links {
   display: flex;
   flex-direction: column;
   gap: 1rem;
@@ -54,14 +132,12 @@
 .main-canvas {
   grid-area: main;
   overflow-y: auto;
-  /* Allow scrolling */
   padding: 2rem;
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
 }
 
-/* Keep card styling from before */
 .card {
   background-color: #1a1a1a;
   padding: 2em;
@@ -72,7 +148,6 @@
   border: 1px solid #2d3748;
 }
 
-/* ... (other styles like textarea, table, etc. remain the same) ... */
 textarea {
   width: 100%;
   padding: 0.5rem;
@@ -93,21 +168,17 @@ pre {
   color: #eee;
 }
 
-input[type="file"] {
-  display: none;
-}
-
+button,
+textarea,
 .custom-file-upload {
-  border: 1px solid #555;
-  display: inline-block;
-  padding: 6px 12px;
-  cursor: pointer;
-  background-color: #333;
-  border-radius: 6px;
+  transition: box-shadow 0.3s ease-in-out, border-color 0.3s ease-in-out;
 }
 
+button:hover:not(:disabled),
+textarea:hover:not(:disabled),
 .custom-file-upload:hover {
-  background-color: #444;
+  border-color: var(--quantum-teal);
+  box-shadow: 0 0 10px 0 var(--quantum-teal);
 }
 
 .table-container {
@@ -134,24 +205,26 @@ th {
   color: #888;
 }
 
-/* Glowing Effects for Interactive Elements */
-button,
-textarea,
-.custom-file-upload {
-  transition: box-shadow 0.3s ease-in-out, border-color 0.3s ease-in-out;
+.chart-controls {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+  justify-content: center;
 }
 
-button:hover:not(:disabled),
-textarea:hover:not(:disabled),
-.custom-file-upload:hover {
-  border-color: var(--quantum-teal);
-  box-shadow: 0 0 10px 0 var(--quantum-teal);
+.select-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
 }
 
-.sidebar {
-  flex-direction: column;
-  justify-content: space-between;
-  /* Pushes memory panel to the bottom */
+select {
+  padding: 0.5rem;
+  border-radius: 6px;
+  border: 1px solid #555;
+  background-color: #333;
+  color: var(--stellar-white);
+  font-family: var(--font-sans);
 }
 
 .memory-panel {
@@ -200,7 +273,6 @@ textarea:hover:not(:disabled),
 
 .memory-insight {
   color: #aaa;
-  /* Lighter color for AI response */
   margin: 0;
 }
 
@@ -209,7 +281,6 @@ textarea:hover:not(:disabled),
   flex-direction: column;
   gap: 1rem;
   height: 400px;
-  /* Or any height you prefer */
 }
 
 .chat-window {
@@ -272,56 +343,38 @@ textarea:hover:not(:disabled),
   flex-shrink: 0;
 }
 
-.header {
-  gap: 0.5rem;
+.dropzone {
+  border: 2px dashed #555;
+  border-radius: 8px;
+  padding: 4rem;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.3s ease-in-out, background-color 0.3s ease-in-out;
+  color: #888;
 }
 
-.status-indicator {
-  padding: 0.25rem 0.75rem;
-  border-radius: 9999px;
-  font-size: 0.9rem;
-  font-weight: 500;
-  transition: all 0.3s ease-in-out;
+.dropzone:hover {
+  border-color: var(--quantum-teal);
 }
 
-.status-indicator.idle {
-  background-color: rgba(59, 130, 246, 0.2);
-  color: var(--cosmic-blue);
+.dropzone.active {
+  border-color: var(--nebula-purple);
+  background-color: rgba(99, 102, 241, 0.1);
 }
 
-.status-indicator.thinking {
-  background-color: rgba(245, 158, 11, 0.2);
-  color: var(--solar-orange);
-}
-
-.status-indicator.success {
-  background-color: rgba(16, 185, 129, 0.2);
-  color: var(--aurora-green);
-}
-
-.status-indicator.error {
-  background-color: rgba(236, 72, 153, 0.2);
-  color: var(--plasma-pink);
-}
-
-.chart-controls {
-  display: flex;
-  gap: 1rem;
-  margin-bottom: 1.5rem;
-  justify-content: center;
-}
-
-.select-wrapper {
+.model-selector {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  padding: 0.5rem;
+  background-color: #242424;
+  border-radius: 6px;
 }
 
-select {
-  padding: 0.5rem;
-  border-radius: 6px;
-  border: 1px solid #555;
-  background-color: #333;
-  color: var(--stellar-white);
-  font-family: var(--font-sans);
+.model-selector label {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  cursor: pointer;
 }

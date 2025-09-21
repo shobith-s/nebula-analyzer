@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'; // This line is now fixed
+import { useState, useMemo } from 'react';
 import axios from 'axios';
 import { motion } from 'framer-motion';
 import DataTable from './DataTable';
@@ -21,6 +21,7 @@ function MainCanvas({ setAiStatus }: MainCanvasProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [xAxis, setXAxis] = useState<string>('');
   const [yAxis, setYAxis] = useState<string>('');
+  const [modelChoice, setModelChoice] = useState<'gemini' | 'local'>('gemini');
 
   const handleFileParsed = (data: string[][], headers: string[], fileName: string) => {
     setMessages([{ sender: 'ai', text: `Successfully loaded ${fileName}. Columns detected: ${headers.join(', ')}. What would you like to know?` }]);
@@ -48,6 +49,7 @@ function MainCanvas({ setAiStatus }: MainCanvasProps) {
     const requestData = {
       tabular_data: [headers, ...tabularData],
       query: query,
+      model_choice: modelChoice,
     };
 
     try {
@@ -89,6 +91,27 @@ function MainCanvas({ setAiStatus }: MainCanvasProps) {
       ) : (
         <>
           <motion.div className="card" variants={cardVariants} initial="hidden" animate="visible">
+            <div className="model-selector">
+              <span>Select AI Engine:</span>
+              <label>
+                <input 
+                  type="radio" 
+                  value="gemini" 
+                  checked={modelChoice === 'gemini'} 
+                  onChange={() => setModelChoice('gemini')}
+                />
+                Gemini API (Cloud)
+              </label>
+              <label>
+                <input 
+                  type="radio" 
+                  value="local" 
+                  checked={modelChoice === 'local'} 
+                  onChange={() => setModelChoice('local')}
+                />
+                GPT-Neo (Local)
+              </label>
+            </div>
             <div className="chat-container">
               <ChatWindow messages={messages} />
               <ChatInput onSendMessage={handleSendMessage} isLoading={isLoading} disabled={!tabularData} />

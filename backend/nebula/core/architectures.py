@@ -21,9 +21,7 @@ class NEBULABrain(nn.Module):
     def __init__(self, tabular_input_dim: int):
         super().__init__()
         self.memory = deque(maxlen=3)
-        
         self.tabular_output_dim = 16
-        
         self.tabular_encoder = MLP(
             input_dim=tabular_input_dim,
             output_dim=self.tabular_output_dim
@@ -43,10 +41,8 @@ class NEBULABrain(nn.Module):
     def train(self, X_tabular, y_tabular, epochs=5):
         print("\n--- Starting Brain Training ---")
         print(f"Training MLP module for {epochs} epochs...")
-        
         optimizer = torch.optim.Adam(self.tabular_encoder.parameters())
         loss_fn = nn.MSELoss()
-
         for epoch in range(epochs):
             optimizer.zero_grad()
             features = self.tabular_encoder(X_tabular)
@@ -58,23 +54,15 @@ class NEBULABrain(nn.Module):
     def get_feature_importances(self, tabular_data: torch.Tensor):
         print("Calculating feature importances...")
         self.tabular_encoder.eval()
-        
         if tabular_data.grad is not None:
             tabular_data.grad.zero_()
-            
         tabular_data.requires_grad = True
-        
         features = self.tabular_encoder(tabular_data)
         features.sum().backward()
-        
         importances = tabular_data.grad.abs().sum(dim=0)
-        
-        # Check for NaN/Inf in gradients before normalizing
         if torch.isnan(importances).any() or torch.isinf(importances).any() or importances.sum() == 0:
             return np.zeros(tabular_data.shape[1])
-
         normalized_importances = importances / importances.sum()
-        
         final_importances = normalized_importances.detach().cpu().numpy()
         np.nan_to_num(final_importances, nan=0.0, posinf=0.0, neginf=0.0, copy=False)
         return final_importances
@@ -87,21 +75,18 @@ class NEBULABrain(nn.Module):
             context_str += f"- The user asked: '{q}'\n- You answered: '{i}'\n"
         return context_str
 
-    def think(self, tabular_data, query, stats_summary="", trend_summary="", anomaly_summary="", xai_summary=""):
+    def think(self, tabular_data, query, model_choice="gemini", **kwargs):
         print(f"\n--- New Task ---")
         print(f"Received query: '{query}'")
-        
         memory_context = self._get_memory_context()
         tabular_features = self.tabular_encoder(tabular_data)
         
         insight = self.conversation.generate_response(
             query=query, 
             features=tabular_features, 
+            model_choice=model_choice,
             memory_context=memory_context, 
-            stats_summary=stats_summary,
-            trend_summary=trend_summary,
-            anomaly_summary=anomaly_summary,
-            xai_summary=xai_summary
+            **kwargs
         )
         
         self.memory.append((query, insight))
