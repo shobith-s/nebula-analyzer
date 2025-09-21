@@ -13,7 +13,10 @@ from nebula.core.models import VAE
 app = FastAPI(title="NEBULA Brain API (Structured Data)")
 
 # --- CORS Configuration ---
-origins = ["http://localhost:5173", "http://127.0.0.1:5173"]
+origins = [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+]
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
@@ -90,17 +93,23 @@ def analyze_data(request: AnalysisRequest):
     dummy_ytrain = torch.randn(tabular_tensor.shape[0], output_dim)
     brain.train(X_tabular=tabular_tensor, y_tabular=dummy_ytrain, epochs=2)
     
-    insight = brain.think(
-        tabular_data=tabular_tensor, query=request.query, 
-        stats_summary=numeric_df.describe().to_string(), 
-        trend_summary=trend_summary, 
-        anomaly_summary=anomaly_summary
-    )
-    
-    # FIXED: Pass the clean 'tabular_tensor' to the importance calculation
+    # Create the XAI summary to feed into the prompt
     importances = brain.get_feature_importances(tabular_data=tabular_tensor)
     numeric_headers = numeric_df.columns.tolist()
     formatted_importances = [{"name": f"{h}", "importance": float(imp)} for h, imp in zip(numeric_headers, importances)]
+    
+    top_importances = sorted(formatted_importances, key=lambda x: x['importance'], reverse=True)[:3]
+    xai_summary = "Feature importance analysis shows the top 3 most influential columns are: "
+    xai_summary += ", ".join([f"'{item['name']}'" for item in top_importances]) + "."
+    
+    insight = brain.think(
+        tabular_data=tabular_tensor, 
+        query=request.query, 
+        stats_summary=numeric_df.describe().to_string(), 
+        trend_summary=trend_summary, 
+        anomaly_summary=anomaly_summary,
+        xai_summary=xai_summary
+    )
     
     return {"insight": insight, "feature_importances": formatted_importances, "anomalies": anomaly_indices}
 

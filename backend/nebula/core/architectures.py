@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-import numpy as np  # Add numpy import for NaN handling
+import numpy as np
 from collections import deque
 from nebula.core.conversation import NeuralConversationEngine
 
@@ -68,23 +68,26 @@ class NEBULABrain(nn.Module):
         features.sum().backward()
         
         importances = tabular_data.grad.abs().sum(dim=0)
+        
+        # Check for NaN/Inf in gradients before normalizing
+        if torch.isnan(importances).any() or torch.isinf(importances).any() or importances.sum() == 0:
+            return np.zeros(tabular_data.shape[1])
+
         normalized_importances = importances / importances.sum()
         
-        # --- FIXED: Convert to NumPy and clean any NaN/inf values ---
         final_importances = normalized_importances.detach().cpu().numpy()
         np.nan_to_num(final_importances, nan=0.0, posinf=0.0, neginf=0.0, copy=False)
         return final_importances
-        # -----------------------------------------------------------
 
     def _get_memory_context(self):
         if not self.memory:
             return ""
-        context_str = "Prior Conversation Context:\n"
+        context_str = "Prior Conversation History:\n"
         for q, i in self.memory:
             context_str += f"- The user asked: '{q}'\n- You answered: '{i}'\n"
         return context_str
 
-    def think(self, tabular_data, query, stats_summary="", trend_summary="", anomaly_summary=""):
+    def think(self, tabular_data, query, stats_summary="", trend_summary="", anomaly_summary="", xai_summary=""):
         print(f"\n--- New Task ---")
         print(f"Received query: '{query}'")
         
@@ -97,7 +100,8 @@ class NEBULABrain(nn.Module):
             memory_context=memory_context, 
             stats_summary=stats_summary,
             trend_summary=trend_summary,
-            anomaly_summary=anomaly_summary
+            anomaly_summary=anomaly_summary,
+            xai_summary=xai_summary
         )
         
         self.memory.append((query, insight))

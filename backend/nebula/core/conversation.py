@@ -2,12 +2,8 @@ import torch
 from transformers import AutoTokenizer, AutoModelForCausalLM
 
 class NeuralConversationEngine:
-    """
-    Manages dialogue and generates natural language insights.
-    """
     def __init__(self):
         model_name = "EleutherAI/gpt-neo-125M"
-        
         self.tokenizer = AutoTokenizer.from_pretrained(model_name)
         self.model = AutoModelForCausalLM.from_pretrained(model_name)
         
@@ -16,18 +12,18 @@ class NeuralConversationEngine:
         
         print(f"NeuralConversationEngine initialized with efficient model: {model_name}.")
 
-    # FIXED: Added the missing 'anomaly_summary' parameter
-    def generate_response(self, query, features, memory_context="", stats_summary="", trend_summary="", anomaly_summary=""):
-        """
-        Generates a text response based on a query, data features, and analytical summaries.
-        """
-        print("Generating response with stats, trend, and anomaly context...")
+    def generate_response(self, query, features, memory_context="", stats_summary="", trend_summary="", anomaly_summary="", xai_summary=""):
+        print("Generating response with stats, trend, anomaly, and XAI context...")
         
         prompt = (
-            f"Here is a statistical summary of a dataset:\n{stats_summary}\n\n"
-            f"Here is a trend analysis of the first two columns:\n{trend_summary}\n\n"
-            f"Here is an anomaly detection summary:\n{anomaly_summary}\n\n"
-            f"Based on all this information, please answer the following user question: {query}"
+            "You are NEBULA, a world-class AI data analyst. Your task is to provide a data-driven insight. "
+            "You have been provided with a user's query and several pre-computed analyses of their data. "
+            "Synthesize these pieces of information into a single, coherent, human-readable insight.\n\n"
+            f"--- Statistical Summary ---\n{stats_summary}\n\n"
+            f"--- Trend Analysis ---\n{trend_summary}\n\n"
+            f"--- Feature Importance (XAI) Summary ---\n{xai_summary}\n\n"
+            f"--- User Query ---\n{query}\n\n"
+            "Generated Insight:"
         )
 
         inputs = self.tokenizer(prompt, return_tensors="pt")
@@ -44,6 +40,10 @@ class NeuralConversationEngine:
         
         generated_text = self.tokenizer.decode(output_sequences[0], skip_special_tokens=True)
         
-        insight = generated_text[len(prompt):].strip()
+        if "Generated Insight:" in generated_text:
+            insight = generated_text.split("Generated Insight:")[1].strip()
+        else:
+            # Fallback if the model doesn't repeat the split string
+            insight = generated_text[len(prompt):].strip()
             
         return insight
