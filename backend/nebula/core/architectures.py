@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+import numpy as np  # Add numpy import for NaN handling
 from collections import deque
 from nebula.core.conversation import NeuralConversationEngine
 
@@ -52,28 +53,38 @@ class NEBULABrain(nn.Module):
             loss = loss_fn(features, y_tabular)
             loss.backward()
             optimizer.step()
-        print(f"Epoch {epoch+1}/{epochs}, Loss: {loss.item():.4f}")
         print("--- Brain Training Finished ---")
     
     def get_feature_importances(self, tabular_data: torch.Tensor):
         print("Calculating feature importances...")
         self.tabular_encoder.eval()
+        
+        if tabular_data.grad is not None:
+            tabular_data.grad.zero_()
+            
         tabular_data.requires_grad = True
+        
         features = self.tabular_encoder(tabular_data)
         features.sum().backward()
+        
         importances = tabular_data.grad.abs().sum(dim=0)
         normalized_importances = importances / importances.sum()
-        return normalized_importances.detach().cpu().numpy()
+        
+        # --- FIXED: Convert to NumPy and clean any NaN/inf values ---
+        final_importances = normalized_importances.detach().cpu().numpy()
+        np.nan_to_num(final_importances, nan=0.0, posinf=0.0, neginf=0.0, copy=False)
+        return final_importances
+        # -----------------------------------------------------------
 
     def _get_memory_context(self):
         if not self.memory:
             return ""
-        context_str = "Prior Conversation History:\n"
+        context_str = "Prior Conversation Context:\n"
         for q, i in self.memory:
             context_str += f"- The user asked: '{q}'\n- You answered: '{i}'\n"
         return context_str
 
-    def think(self, tabular_data, query, stats_summary="", trend_summary=""):
+    def think(self, tabular_data, query, stats_summary="", trend_summary="", anomaly_summary=""):
         print(f"\n--- New Task ---")
         print(f"Received query: '{query}'")
         
@@ -85,7 +96,8 @@ class NEBULABrain(nn.Module):
             features=tabular_features, 
             memory_context=memory_context, 
             stats_summary=stats_summary,
-            trend_summary=trend_summary
+            trend_summary=trend_summary,
+            anomaly_summary=anomaly_summary
         )
         
         self.memory.append((query, insight))

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react'; // This line is now fixed
 import axios from 'axios';
 import { motion } from 'framer-motion';
 import DataTable from './DataTable';
@@ -14,22 +14,19 @@ interface MainCanvasProps {
 }
 
 function MainCanvas({ setAiStatus }: MainCanvasProps) {
-  const [tabularData, setTabularData] = useState<number[][] | null>(null);
+  const [tabularData, setTabularData] = useState<string[][] | null>(null);
+  const [headers, setHeaders] = useState<string[]>([]);
   const [featureImportances, setFeatureImportances] = useState<ImportanceData[] | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  
-  // State for chart controls
-  const [headers, setHeaders] = useState<string[]>([]);
   const [xAxis, setXAxis] = useState<string>('');
   const [yAxis, setYAxis] = useState<string>('');
 
-  const handleFileParsed = (data: number[][], headers: string[], fileName: string) => {
-    setMessages([{ sender: 'ai', text: `Successfully loaded ${fileName}. What would you like to know?` }]);
+  const handleFileParsed = (data: string[][], headers: string[], fileName: string) => {
+    setMessages([{ sender: 'ai', text: `Successfully loaded ${fileName}. Columns detected: ${headers.join(', ')}. What would you like to know?` }]);
     setFeatureImportances(null);
     setTabularData(data);
     setHeaders(headers);
-    // Automatically select the first two columns for the initial chart view
     if (headers.length >= 2) {
       setXAxis(headers[0]);
       setYAxis(headers[1]);
@@ -41,7 +38,7 @@ function MainCanvas({ setAiStatus }: MainCanvasProps) {
   };
 
   const handleSendMessage = async (query: string) => {
-    if (!tabularData) { return; }
+    if (!tabularData || !headers) { return; }
     
     setMessages(prevMessages => [...prevMessages, { sender: 'user', text: query }]);
     setIsLoading(true);
@@ -49,7 +46,7 @@ function MainCanvas({ setAiStatus }: MainCanvasProps) {
     setFeatureImportances(null);
 
     const requestData = {
-      tabular_data: tabularData,
+      tabular_data: [headers, ...tabularData],
       query: query,
     };
 
@@ -58,11 +55,10 @@ function MainCanvas({ setAiStatus }: MainCanvasProps) {
       const response = await axios.post(apiUrl, requestData);
       setMessages(prevMessages => [...prevMessages, { sender: 'ai', text: response.data.insight }]);
       setFeatureImportances(response.data.feature_importances);
+      setAnomalies(response.data.anomalies);
       setAiStatus('success');
     } catch (error) {
-      const errorMsg = axios.isAxiosError(error) && error.response
-        ? `Error from server: ${error.response.data.detail}`
-        : 'Sorry, an error occurred while talking to the brain.';
+      const errorMsg = axios.isAxiosError(error) && error.response ? `Error from server: ${error.response.data.detail}` : 'Sorry, an error occurred while talking to the brain.';
       setMessages(prevMessages => [...prevMessages, { sender: 'ai', text: errorMsg }]);
       setAiStatus('error');
     } finally {
@@ -70,10 +66,19 @@ function MainCanvas({ setAiStatus }: MainCanvasProps) {
     }
   };
 
+  const numericDataForViz = useMemo(() => {
+    if (!tabularData) return [];
+    return tabularData
+        .map(row => row.map(Number))
+        .filter(row => row.every(val => !isNaN(val)));
+  }, [tabularData]);
+
   const cardVariants = {
     hidden: { opacity: 0, y: 20 },
     visible: { opacity: 1, y: 0, transition: { duration: 0.5 } },
   };
+
+  const [anomalies, setAnomalies] = useState<number[]>([]);
 
   return (
     <main className="main-canvas">
@@ -111,8 +116,8 @@ function MainCanvas({ setAiStatus }: MainCanvasProps) {
                   </select>
                 </div>
               </div>
-              <DataChart data={tabularData} headers={headers} xAxisKey={xAxis} yAxisKey={yAxis} />
-              <DataTable data={tabularData} headers={headers} />
+              <DataChart data={numericDataForViz} headers={headers} xAxisKey={xAxis} yAxisKey={yAxis} />
+              <DataTable data={numericDataForViz} headers={headers} anomalies={anomalies} />
           </motion.div>
         </>
       )}

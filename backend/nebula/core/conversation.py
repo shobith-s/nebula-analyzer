@@ -16,15 +16,17 @@ class NeuralConversationEngine:
         
         print(f"NeuralConversationEngine initialized with efficient model: {model_name}.")
 
-    def generate_response(self, query, features, memory_context="", stats_summary="", trend_summary=""):
+    # FIXED: Added the missing 'anomaly_summary' parameter
+    def generate_response(self, query, features, memory_context="", stats_summary="", trend_summary="", anomaly_summary=""):
         """
         Generates a text response based on a query, data features, and analytical summaries.
         """
-        print("Generating response with stats and trend context...")
+        print("Generating response with stats, trend, and anomaly context...")
         
         prompt = (
             f"Here is a statistical summary of a dataset:\n{stats_summary}\n\n"
             f"Here is a trend analysis of the first two columns:\n{trend_summary}\n\n"
+            f"Here is an anomaly detection summary:\n{anomaly_summary}\n\n"
             f"Based on all this information, please answer the following user question: {query}"
         )
 
