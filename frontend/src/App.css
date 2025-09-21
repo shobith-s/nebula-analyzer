@@ -303,3 +303,25 @@ textarea:hover:not(:disabled),
   background-color: rgba(236, 72, 153, 0.2);
   color: var(--plasma-pink);
 }
+
+.chart-controls {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+  justify-content: center;
+}
+
+.select-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+select {
+  padding: 0.5rem;
+  border-radius: 6px;
+  border: 1px solid #555;
+  background-color: #333;
+  color: var(--stellar-white);
+  font-family: var(--font-sans);
+}

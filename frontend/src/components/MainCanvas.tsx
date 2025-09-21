@@ -1,32 +1,42 @@
-// In frontend/src/components/MainCanvas.tsx
 import { useState } from 'react';
 import axios from 'axios';
-import Papa from 'papaparse';
 import { motion } from 'framer-motion';
 import DataTable from './DataTable';
 import DataChart from './DataChart';
 import FeatureImportanceChart from './FeatureImportanceChart';
 import ChatInput from './ChatInput';
-import ChatWindow from './ChatWindow';
+import ChatWindow, { type Message } from './ChatWindow';
 import FileUploadZone from './FileUploadZone';
-import { type AIStatus, type Message, type ImportanceData } from '../types'; // Import from new types file
+import { type AIStatus, type ImportanceData } from '../types';
 
 interface MainCanvasProps {
   setAiStatus: (status: AIStatus) => void;
 }
 
 function MainCanvas({ setAiStatus }: MainCanvasProps) {
-  // ... rest of the component logic is unchanged
   const [tabularData, setTabularData] = useState<number[][] | null>(null);
   const [featureImportances, setFeatureImportances] = useState<ImportanceData[] | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  
+  // State for chart controls
+  const [headers, setHeaders] = useState<string[]>([]);
+  const [xAxis, setXAxis] = useState<string>('');
+  const [yAxis, setYAxis] = useState<string>('');
 
-  const handleFileParsed = (data: number[][], fileName: string) => {
-    setMessages([]);
+  const handleFileParsed = (data: number[][], headers: string[], fileName: string) => {
+    setMessages([{ sender: 'ai', text: `Successfully loaded ${fileName}. What would you like to know?` }]);
     setFeatureImportances(null);
     setTabularData(data);
-    setMessages([{ sender: 'ai', text: `Successfully loaded ${fileName}. What would you like to know?` }]);
+    setHeaders(headers);
+    // Automatically select the first two columns for the initial chart view
+    if (headers.length >= 2) {
+      setXAxis(headers[0]);
+      setYAxis(headers[1]);
+    } else if (headers.length > 0) {
+      setXAxis(headers[0]);
+      setYAxis(headers[0]);
+    }
     setAiStatus('idle');
   };
 
@@ -86,12 +96,24 @@ function MainCanvas({ setAiStatus }: MainCanvasProps) {
             </motion.div>
           )}
           
-          {tabularData && tabularData.length > 0 && (
-            <motion.div className="card" variants={cardVariants} initial="hidden" animate="visible">
-                <DataChart data={tabularData} />
-                <DataTable data={tabularData} />
-            </motion.div>
-          )}
+          <motion.div className="card" variants={cardVariants} initial="hidden" animate="visible">
+              <div className="chart-controls">
+                <div className="select-wrapper">
+                  <label>X-Axis:</label>
+                  <select value={xAxis} onChange={(e) => setXAxis(e.target.value)}>
+                    {headers.map(h => <option key={h} value={h}>{h}</option>)}
+                  </select>
+                </div>
+                <div className="select-wrapper">
+                  <label>Y-Axis:</label>
+                  <select value={yAxis} onChange={(e) => setYAxis(e.target.value)}>
+                    {headers.map(h => <option key={h} value={h}>{h}</option>)}
+                  </select>
+                </div>
+              </div>
+              <DataChart data={tabularData} headers={headers} xAxisKey={xAxis} yAxisKey={yAxis} />
+              <DataTable data={tabularData} headers={headers} />
+          </motion.div>
         </>
       )}
     </main>
