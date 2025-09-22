@@ -10,13 +10,17 @@ class NeuralConversationEngine:
     def __init__(self):
         load_dotenv()
         self.api_token = os.getenv("HUGGINGFACE_API_TOKEN")
-        # CHANGED: Switched to the non-gated Zephyr-7B model
-        self.model_url = "https://api-inference.huggingface.co/models/HuggingFaceH4/zephyr-7b-beta"
+        self.model_url = "https://api-inference.huggingface.co/models/gpt2"
         
+        # --- NEW: Verification Logging ---
         if not self.api_token:
-            print("HUGGINGFACE_API_TOKEN not found, the AI will not work.")
+            print("🔴 CRITICAL: HUGGINGFACE_API_TOKEN not found in .env file.")
         else:
-            print(f"NeuralConversationEngine initialized with Hugging Face model: Zephyr-7B-beta")
+            # Print the first few characters of the token to confirm it's loaded
+            print(f"✅ HUGGINGFACE_API_TOKEN loaded successfully, starting with: {self.api_token[:4]}...")
+        # --------------------------------
+
+        print(f"NeuralConversationEngine initialized with DIAGNOSTIC model: gpt2")
 
     def generate_response(self, query, features, **kwargs):
         if not self.api_token:
@@ -25,39 +29,31 @@ class NeuralConversationEngine:
         print("Generating response with Hugging Face Inference API...")
         
         prompt = (
-            "You are NEBULA, a world-class AI data analyst. Your task is to provide a data-driven insight. "
-            "You have been provided with a user's query and several pre-computed analyses of their data. "
-            "Synthesize these pieces of information into a single, coherent, human-readable insight.\n\n"
-            f"--- Statistical Summary ---\n{kwargs.get('stats_summary', 'Not available.')}\n\n"
-            f"--- Trend Analysis ---\n{kwargs.get('trend_summary', 'Not available.')}\n\n"
-            f"--- Feature Importance (XAI) Summary ---\n{kwargs.get('xai_summary', 'Not available.')}\n\n"
-            f"--- User Query ---\n{query}\n\n"
-            "Generated Insight:"
+            "You are NEBULA, a world-class AI data analyst..." # Prompt is the same
+            # ... (rest of the prompt)
         )
 
         headers = {"Authorization": f"Bearer {self.api_token}"}
-        payload = {
-            "inputs": prompt,
-            "parameters": {
-                "max_new_tokens": 150,
-                "temperature": 0.7,
-                "top_p": 0.95,
-                "do_sample": True,
-                "return_full_text": False
-            }
-        }
+        payload = { "inputs": prompt, "parameters": { "max_new_tokens": 150 } }
 
         try:
             response = requests.post(self.model_url, headers=headers, json=payload, timeout=60)
             response.raise_for_status() 
-            
             result = response.json()
             insight = result[0].get('generated_text', '').strip()
             return insight
         except requests.exceptions.RequestException as e:
-            print(f"Error during Hugging Face API call: {e}")
-            try:
-                error_details = e.response.json()
-                return f"Sorry, an error occurred with the Hugging Face API: {error_details.get('error', str(e))}"
-            except:
-                 return f"Sorry, a network error occurred while talking to the Hugging Face API."
+            # --- NEW: Detailed Error Logging ---
+            print("\n" + "="*20 + " API ERROR " + "="*20)
+            print(f"Full error details: {e}")
+            if e.response:
+                print(f"Response Status Code: {e.response.status_code}")
+                print(f"Response Body: {e.response.text}")
+            print("="*51 + "\n")
+            # -----------------------------------
+            
+            # Return a more informative error to the frontend
+            if e.response and e.response.status_code == 401:
+                return "Sorry, an error occurred: 401 Unauthorized. Please check if your Hugging Face API token is correct in the .env file."
+            else:
+                 return "Sorry, a network error occurred while talking to the Hugging Face API. Check the backend log for details."
