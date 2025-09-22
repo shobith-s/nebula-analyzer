@@ -35,6 +35,7 @@ class NEBULABrain(nn.Module):
             )
 
     def train(self, X_tabular, y_tabular, epochs=5):
+        # ... (This method is unchanged)
         print("\n--- Starting Brain Training ---")
         optimizer = torch.optim.Adam(self.tabular_encoder.parameters())
         loss_fn = nn.MSELoss()
@@ -47,6 +48,7 @@ class NEBULABrain(nn.Module):
         print("--- Brain Training Finished ---")
     
     def get_feature_importances(self, tabular_data: torch.Tensor):
+        # ... (This method is unchanged)
         self.tabular_encoder.eval()
         if tabular_data.grad is not None:
             tabular_data.grad.zero_()
@@ -62,6 +64,7 @@ class NEBULABrain(nn.Module):
         return final_importances
 
     def _get_memory_context(self):
+        # ... (This method is unchanged)
         if not self.memory: return ""
         context_str = "Prior Conversation History:\n"
         for q, i in self.memory:

@@ -32,13 +32,12 @@ class NeuralConversationEngine:
 
     def generate_response(self, query, features, model_choice="gemini", **kwargs):
         prompt = (
-            "You are NEBULA, a world-class AI data analyst. Your task is to provide a data-driven insight. "
-            "You have been provided with a user's query and several pre-computed analyses of their data. "
-            "Synthesize these pieces of information into a single, coherent, human-readable insight.\n\n"
-            f"--- Statistical Summary ---\n{kwargs.get('stats_summary', 'Not available.')}\n\n"
-            f"--- Trend Analysis ---\n{kwargs.get('trend_summary', 'Not available.')}\n\n"
-            f"--- Feature Importance (XAI) Summary ---\n{kwargs.get('xai_summary', 'Not available.')}\n\n"
-            f"--- User Query ---\n{query}\n\n"
+            "You are NEBULA, a world-class AI data analyst. Your task is to provide a data-driven insight based on the CURRENT TASK section. Use the Prior Conversation History for context only.\n\n"
+            f"--- Prior Conversation History ---\n{kwargs.get('memory_context', 'None')}\n"
+            "--------------------------------\n\n"
+            "--- CURRENT TASK ---\n"
+            f"Statistical Summary of New Data:\n{kwargs.get('stats_summary', 'Not available.')}\n\n"
+            f"User Query about New Data: {query}\n\n"
             "Generated Insight:"
         )
 

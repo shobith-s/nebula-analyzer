@@ -24,6 +24,7 @@ function MainCanvas({ setAiStatus }: MainCanvasProps) {
   const [modelChoice, setModelChoice] = useState<'gemini' | 'local'>('gemini');
 
   const handleFileParsed = (data: string[][], headers: string[], fileName: string) => {
+    // ... (This function is unchanged)
     setMessages([{ sender: 'ai', text: `Successfully loaded ${fileName}. Columns detected: ${headers.join(', ')}. What would you like to know?` }]);
     setFeatureImportances(null);
     setTabularData(data);
@@ -45,11 +46,12 @@ function MainCanvas({ setAiStatus }: MainCanvasProps) {
     setIsLoading(true);
     setAiStatus('thinking');
     setFeatureImportances(null);
+    setAnomalies([]);
 
     const requestData = {
       tabular_data: [headers, ...tabularData],
       query: query,
-      model_choice: modelChoice,
+      model_choice: modelChoice, // This will be sent to the backend
     };
 
     try {
@@ -69,10 +71,9 @@ function MainCanvas({ setAiStatus }: MainCanvasProps) {
   };
 
   const numericDataForViz = useMemo(() => {
+    // ... (This function is unchanged)
     if (!tabularData) return [];
-    return tabularData
-        .map(row => row.map(Number))
-        .filter(row => row.every(val => !isNaN(val)));
+    return tabularData.map(row => row.map(Number)).filter(row => row.every(val => !isNaN(val)));
   }, [tabularData]);
 
   const cardVariants = {
@@ -94,21 +95,11 @@ function MainCanvas({ setAiStatus }: MainCanvasProps) {
             <div className="model-selector">
               <span>Select AI Engine:</span>
               <label>
-                <input 
-                  type="radio" 
-                  value="gemini" 
-                  checked={modelChoice === 'gemini'} 
-                  onChange={() => setModelChoice('gemini')}
-                />
+                <input type="radio" value="gemini" checked={modelChoice === 'gemini'} onChange={() => setModelChoice('gemini')} />
                 Gemini API (Cloud)
               </label>
               <label>
-                <input 
-                  type="radio" 
-                  value="local" 
-                  checked={modelChoice === 'local'} 
-                  onChange={() => setModelChoice('local')}
-                />
+                <input type="radio" value="local" checked={modelChoice === 'local'} onChange={() => setModelChoice('local')} />
                 GPT-Neo (Local)
               </label>
             </div>
