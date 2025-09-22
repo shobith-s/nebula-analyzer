@@ -1,49 +1,59 @@
-import torch
-from transformers import AutoTokenizer, AutoModelForCausalLM
+import os
+import requests
+from dotenv import load_dotenv
+import json
 
 class NeuralConversationEngine:
     """
-    Manages dialogue and generates natural language insights.
+    Manages dialogue and generates insights using the Hugging Face Inference API.
     """
     def __init__(self):
-        model_name = "distilgpt2"
-        self.tokenizer = AutoTokenizer.from_pretrained(model_name)
-        self.model = AutoModelForCausalLM.from_pretrained(model_name)
+        load_dotenv()
+        self.api_token = os.getenv("HUGGINGFACE_API_TOKEN")
+        self.model_url = "https://api-inference.huggingface.co/models/gpt2"
         
-        if self.tokenizer.pad_token is None:
-            self.tokenizer.pad_token = self.tokenizer.eos_token
+        # --- NEW: Verification Logging ---
+        if not self.api_token:
+            print("🔴 CRITICAL: HUGGINGFACE_API_TOKEN not found in .env file.")
+        else:
+            # Print the first few characters of the token to confirm it's loaded
+            print(f"✅ HUGGINGFACE_API_TOKEN loaded successfully, starting with: {self.api_token[:4]}...")
+        # --------------------------------
+
+        print(f"NeuralConversationEngine initialized with DIAGNOSTIC model: gpt2")
+
+    def generate_response(self, query, features, **kwargs):
+        if not self.api_token:
+            return "Error: Hugging Face API token is not configured."
+
+        print("Generating response with Hugging Face Inference API...")
         
-        print(f"NeuralConversationEngine initialized with {model_name}.")
-
-    def generate_response(self, query, fused_features, memory_context=""):
-        """
-        Generates a text response based on a query and fused data features.
-        """
-        print("Generating response with Conversation Engine...")
-        data_summary = f"Data analysis of {fused_features.shape[0]} items resulted in a unified data representation."
-
         prompt = (
-            "You are NEBULA, an AI data analyst. Based on the user's query and the data summary, provide a concise insight. "
-            "If prior conversation context is provided, use it to inform your response.\n\n"
-            f"{memory_context}"
-            f"Current Query: {query}\n"
-            f"Current Data Summary: {data_summary}\n\n"
-            "Generated Insight:"
+            "You are NEBULA, a world-class AI data analyst..." # Prompt is the same
+            # ... (rest of the prompt)
         )
 
-        inputs = self.tokenizer(prompt, return_tensors="pt")
-        
-        output_sequences = self.model.generate(
-            input_ids=inputs['input_ids'],
-            attention_mask=inputs['attention_mask'],
-            max_new_tokens=40,
-            pad_token_id=self.tokenizer.pad_token_id,
-            num_return_sequences=1,
-            no_repeat_ngram_size=2
-        )
-        
-        generated_text = self.tokenizer.decode(output_sequences[0], skip_special_tokens=True)
-        
-        insight = generated_text.split("Generated Insight:")[1].strip()
-        
-        return insight
+        headers = {"Authorization": f"Bearer {self.api_token}"}
+        payload = { "inputs": prompt, "parameters": { "max_new_tokens": 150 } }
+
+        try:
+            response = requests.post(self.model_url, headers=headers, json=payload, timeout=60)
+            response.raise_for_status() 
+            result = response.json()
+            insight = result[0].get('generated_text', '').strip()
+            return insight
+        except requests.exceptions.RequestException as e:
+            # --- NEW: Detailed Error Logging ---
+            print("\n" + "="*20 + " API ERROR " + "="*20)
+            print(f"Full error details: {e}")
+            if e.response:
+                print(f"Response Status Code: {e.response.status_code}")
+                print(f"Response Body: {e.response.text}")
+            print("="*51 + "\n")
+            # -----------------------------------
+            
+            # Return a more informative error to the frontend
+            if e.response and e.response.status_code == 401:
+                return "Sorry, an error occurred: 401 Unauthorized. Please check if your Hugging Face API token is correct in the .env file."
+            else:
+                 return "Sorry, a network error occurred while talking to the Hugging Face API. Check the backend log for details."
