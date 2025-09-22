@@ -1,10 +1,12 @@
+// In frontend/src/components/DataTable.tsx
 import React from 'react';
 
 interface DataTableProps {
   data: number[][];
+  headers: string[]; // Now accepts headers
 }
 
-const DataTable: React.FC<DataTableProps> = ({ data }) => {
+const DataTable: React.FC<DataTableProps> = ({ data, headers }) => {
   if (!data || data.length === 0) {
     return <p>No data to display.</p>;
   }
@@ -15,8 +17,8 @@ const DataTable: React.FC<DataTableProps> = ({ data }) => {
       <table>
         <thead>
           <tr>
-            {data[0].map((_, index) => (
-              <th key={index}>Column {index + 1}</th>
+            {headers.map((header, index) => (
+              <th key={index}>{header}</th>
             ))}
           </tr>
         </thead>
