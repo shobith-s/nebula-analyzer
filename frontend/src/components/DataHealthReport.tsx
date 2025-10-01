@@ -1,5 +1,4 @@
-// In frontend/src/components/DataHealthReport.tsx
-import React from 'react';
+import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 
 // Define the structure of the report data we expect from the backend
@@ -18,20 +17,33 @@ interface Report {
   column_profiles: ColumnProfile[];
 }
 
+export interface CleaningChoices {
+  removeDuplicates: boolean;
+  fillMissing: boolean;
+}
+
 interface DataHealthReportProps {
   report: Report | null;
   fileName: string;
-  onProceed: () => void; // A function to call when the user clicks "Analyze"
+  onProceed: (cleaningChoices: CleaningChoices) => void;
 }
 
 const DataHealthReport: React.FC<DataHealthReportProps> = ({ report, fileName, onProceed }) => {
+  const [cleaningChoices, setCleaningChoices] = useState<CleaningChoices>({
+    removeDuplicates: true,
+    fillMissing: true,
+  });
+
+  const handleChoiceChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, checked } = event.target;
+    setCleaningChoices(prev => ({ ...prev, [name]: checked }));
+  };
+
   if (!report) {
     return <p>Generating data health report...</p>;
   }
 
   const { general_stats, column_profiles } = report;
-
-  // Calculate an overall data quality score
   const total_cells = general_stats.total_rows * column_profiles.length;
   const total_missing = column_profiles.reduce((sum, col) => sum + col.missing_values, 0);
   const quality_score = total_cells > 0 ? ((total_cells - total_missing) / total_cells) * 100 : 100;
@@ -90,13 +102,33 @@ const DataHealthReport: React.FC<DataHealthReportProps> = ({ report, fileName, o
       <div className="cleaning-plan">
         <h3>Suggested Cleaning Plan</h3>
         <ul>
-          <li><input type="checkbox" defaultChecked /> Remove {general_stats.duplicate_rows} duplicate rows.</li>
-          <li><input type="checkbox" defaultChecked /> Fill missing numerical values with the column average (median).</li>
+          <li>
+            <label>
+              <input 
+                type="checkbox" 
+                name="removeDuplicates"
+                checked={cleaningChoices.removeDuplicates}
+                onChange={handleChoiceChange}
+                disabled={general_stats.duplicate_rows === 0}
+              /> Remove {general_stats.duplicate_rows} duplicate rows.
+            </label>
+          </li>
+          <li>
+            <label>
+              <input 
+                type="checkbox" 
+                name="fillMissing"
+                checked={cleaningChoices.fillMissing}
+                onChange={handleChoiceChange}
+                disabled={total_missing === 0}
+              /> Fill missing numerical values with the column average (median).
+            </label>
+          </li>
           <li><input type="checkbox" disabled /> Outliers will be flagged for your attention during analysis.</li>
         </ul>
       </div>
       
-      <button className="analyze-button" onClick={onProceed}>
+      <button className="analyze-button" onClick={() => onProceed(cleaningChoices)}>
         Clean and Proceed to Analysis
       </button>
     </motion.div>

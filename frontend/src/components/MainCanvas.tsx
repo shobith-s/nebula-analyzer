@@ -1,4 +1,3 @@
-// In frontend/src/components/MainCanvas.tsx
 import { useState, useMemo } from 'react';
 import axios from 'axios';
 import { motion } from 'framer-motion';
@@ -8,7 +7,7 @@ import FeatureImportanceChart from './FeatureImportanceChart';
 import ChatInput from './ChatInput';
 import ChatWindow, { type Message } from './ChatWindow';
 import FileUploadZone from './FileUploadZone';
-import DataHealthReport from './DataHealthReport'; // Import our new component
+import DataHealthReport, { type CleaningChoices } from './DataHealthReport';
 import { type AIStatus, type ImportanceData } from '../types';
 
 interface MainCanvasProps {
@@ -25,13 +24,13 @@ interface HealthReport {
   column_profiles: ColumnProfile[];
 }
 
-
 function MainCanvas({ setAiStatus }: MainCanvasProps) {
   const [view, setView] = useState<'upload' | 'profile' | 'analysis'>('upload');
   const [rawData, setRawData] = useState<string[][] | null>(null);
   const [headers, setHeaders] = useState<string[]>([]);
   const [fileName, setFileName] = useState<string>('');
   const [healthReport, setHealthReport] = useState<HealthReport | null>(null);
+  const [cleaningChoices, setCleaningChoices] = useState<CleaningChoices | null>(null);
 
   const [featureImportances, setFeatureImportances] = useState<ImportanceData[] | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -45,7 +44,7 @@ function MainCanvas({ setAiStatus }: MainCanvasProps) {
     setRawData(data);
     setHeaders(headers);
     setFileName(fileName);
-    setView('profile'); // Switch to the profile view
+    setView('profile');
 
     try {
       const response = await axios.post('http://127.0.0.1:8000/profile-data', {
@@ -55,13 +54,14 @@ function MainCanvas({ setAiStatus }: MainCanvasProps) {
     } catch (error) {
       console.error("Failed to profile data:", error);
       alert("Could not generate a data health report.");
-      setView('upload'); // Go back to upload screen on error
+      setView('upload');
     }
   };
 
-  const proceedToAnalysis = () => {
-    setView('analysis'); // Switch to the main analysis/chat view
-    setMessages([{ sender: 'ai', text: `Successfully loaded and profiled ${fileName}. What would you like to know?` }]);
+  const proceedToAnalysis = (choices: CleaningChoices) => {
+    setCleaningChoices(choices);
+    setView('analysis');
+    setMessages([{ sender: 'ai', text: `Successfully loaded and profiled ${fileName}. Cleaning plan approved. What would you like to know?` }]);
   };
 
   const handleSendMessage = async (query: string) => {
@@ -77,6 +77,7 @@ function MainCanvas({ setAiStatus }: MainCanvasProps) {
       tabular_data: [headers, ...rawData],
       query: query,
       model_choice: modelChoice,
+      cleaning_choices: cleaningChoices,
     };
 
     try {
@@ -95,14 +96,15 @@ function MainCanvas({ setAiStatus }: MainCanvasProps) {
     }
   };
 
-  // Helper to convert raw string data to numbers for local visualization
   const numericDataForViz = useMemo(() => {
     if (!rawData) return [];
     return rawData.map(row => row.map(Number)).filter(row => row.every(val => !isNaN(val)));
   }, [rawData]);
 
-
-  const cardVariants = { /* ... */ };
+  const cardVariants = {
+    hidden: { opacity: 0, y: 20 },
+    visible: { opacity: 1, y: 0, transition: { duration: 0.5 } },
+  };
 
   return (
     <main className="main-canvas">
@@ -136,7 +138,7 @@ function MainCanvas({ setAiStatus }: MainCanvasProps) {
             </motion.div>
           )}
           
-          {numericDataForViz.length > 0 && (
+          {rawData && (
             <motion.div className="card" variants={cardVariants} initial="hidden" animate="visible">
                 <div className="chart-controls">
                   <div className="select-wrapper">
