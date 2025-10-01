@@ -40,13 +40,16 @@ const DataHealthReport: React.FC<DataHealthReportProps> = ({ report, fileName, o
   };
 
   if (!report) {
-    return <p>Generating data health report...</p>;
+    return (
+        <div className="card">
+            <p>Generating data health report...</p>
+        </div>
+    );
   }
 
   const { general_stats, column_profiles } = report;
-  const total_cells = general_stats.total_rows * column_profiles.length;
   const total_missing = column_profiles.reduce((sum, col) => sum + col.missing_values, 0);
-  const quality_score = total_cells > 0 ? ((total_cells - total_missing) / total_cells) * 100 : 100;
+  const quality_score = 100 * (1 - (total_missing / (general_stats.total_rows * column_profiles.length || 1)));
 
   return (
     <motion.div 
@@ -124,7 +127,7 @@ const DataHealthReport: React.FC<DataHealthReportProps> = ({ report, fileName, o
               /> Fill missing numerical values with the column average (median).
             </label>
           </li>
-          <li><input type="checkbox" disabled /> Outliers will be flagged for your attention during analysis.</li>
+          <li><input type="checkbox" disabled checked /> Outliers will be flagged for your attention during analysis.</li>
         </ul>
       </div>
       
