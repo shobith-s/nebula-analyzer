@@ -1,3 +1,4 @@
+// In frontend/src/components/MainCanvas.tsx
 import { useState, useMemo } from 'react';
 import axios from 'axios';
 import { motion } from 'framer-motion';
@@ -7,40 +8,64 @@ import FeatureImportanceChart from './FeatureImportanceChart';
 import ChatInput from './ChatInput';
 import ChatWindow, { type Message } from './ChatWindow';
 import FileUploadZone from './FileUploadZone';
+import DataHealthReport from './DataHealthReport'; // Import our new component
 import { type AIStatus, type ImportanceData } from '../types';
 
 interface MainCanvasProps {
   setAiStatus: (status: AIStatus) => void;
 }
 
+// Define the types for the health report
+interface ColumnProfile {
+  column_name: string; data_type: string; missing_values: number;
+  missing_percentage: number; outlier_count: number;
+}
+interface HealthReport {
+  general_stats: { total_rows: number; duplicate_rows: number; };
+  column_profiles: ColumnProfile[];
+}
+
+
 function MainCanvas({ setAiStatus }: MainCanvasProps) {
-  const [tabularData, setTabularData] = useState<string[][] | null>(null);
+  const [view, setView] = useState<'upload' | 'profile' | 'analysis'>('upload');
+  const [rawData, setRawData] = useState<string[][] | null>(null);
   const [headers, setHeaders] = useState<string[]>([]);
+  const [fileName, setFileName] = useState<string>('');
+  const [healthReport, setHealthReport] = useState<HealthReport | null>(null);
+
   const [featureImportances, setFeatureImportances] = useState<ImportanceData[] | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [xAxis, setXAxis] = useState<string>('');
   const [yAxis, setYAxis] = useState<string>('');
   const [modelChoice, setModelChoice] = useState<'gemini' | 'local'>('gemini');
+  const [anomalies, setAnomalies] = useState<number[]>([]);
 
-  const handleFileParsed = (data: string[][], headers: string[], fileName: string) => {
-    // ... (This function is unchanged)
-    setMessages([{ sender: 'ai', text: `Successfully loaded ${fileName}. Columns detected: ${headers.join(', ')}. What would you like to know?` }]);
-    setFeatureImportances(null);
-    setTabularData(data);
+  const handleFileParsed = async (data: string[][], headers: string[], fileName: string) => {
+    setRawData(data);
     setHeaders(headers);
-    if (headers.length >= 2) {
-      setXAxis(headers[0]);
-      setYAxis(headers[1]);
-    } else if (headers.length > 0) {
-      setXAxis(headers[0]);
-      setYAxis(headers[0]);
+    setFileName(fileName);
+    setView('profile'); // Switch to the profile view
+
+    try {
+      const response = await axios.post('http://127.0.0.1:8000/profile-data', {
+        tabular_data: [headers, ...data]
+      });
+      setHealthReport(response.data);
+    } catch (error) {
+      console.error("Failed to profile data:", error);
+      alert("Could not generate a data health report.");
+      setView('upload'); // Go back to upload screen on error
     }
-    setAiStatus('idle');
+  };
+
+  const proceedToAnalysis = () => {
+    setView('analysis'); // Switch to the main analysis/chat view
+    setMessages([{ sender: 'ai', text: `Successfully loaded and profiled ${fileName}. What would you like to know?` }]);
   };
 
   const handleSendMessage = async (query: string) => {
-    if (!tabularData || !headers) { return; }
+    if (!rawData || !headers) { return; }
     
     setMessages(prevMessages => [...prevMessages, { sender: 'user', text: query }]);
     setIsLoading(true);
@@ -49,9 +74,9 @@ function MainCanvas({ setAiStatus }: MainCanvasProps) {
     setAnomalies([]);
 
     const requestData = {
-      tabular_data: [headers, ...tabularData],
+      tabular_data: [headers, ...rawData],
       query: query,
-      model_choice: modelChoice, // This will be sent to the backend
+      model_choice: modelChoice,
     };
 
     try {
@@ -70,42 +95,38 @@ function MainCanvas({ setAiStatus }: MainCanvasProps) {
     }
   };
 
+  // Helper to convert raw string data to numbers for local visualization
   const numericDataForViz = useMemo(() => {
-    // ... (This function is unchanged)
-    if (!tabularData) return [];
-    return tabularData.map(row => row.map(Number)).filter(row => row.every(val => !isNaN(val)));
-  }, [tabularData]);
+    if (!rawData) return [];
+    return rawData.map(row => row.map(Number)).filter(row => row.every(val => !isNaN(val)));
+  }, [rawData]);
 
-  const cardVariants = {
-    hidden: { opacity: 0, y: 20 },
-    visible: { opacity: 1, y: 0, transition: { duration: 0.5 } },
-  };
 
-  const [anomalies, setAnomalies] = useState<number[]>([]);
+  const cardVariants = { /* ... */ };
 
   return (
     <main className="main-canvas">
-      {!tabularData ? (
+      {view === 'upload' && (
         <motion.div className="card" variants={cardVariants} initial="hidden" animate="visible">
           <FileUploadZone onFileParsed={handleFileParsed} />
         </motion.div>
-      ) : (
+      )}
+
+      {view === 'profile' && (
+        <DataHealthReport report={healthReport} fileName={fileName} onProceed={proceedToAnalysis} />
+      )}
+      
+      {view === 'analysis' && (
         <>
           <motion.div className="card" variants={cardVariants} initial="hidden" animate="visible">
             <div className="model-selector">
               <span>Select AI Engine:</span>
-              <label>
-                <input type="radio" value="gemini" checked={modelChoice === 'gemini'} onChange={() => setModelChoice('gemini')} />
-                Gemini API (Cloud)
-              </label>
-              <label>
-                <input type="radio" value="local" checked={modelChoice === 'local'} onChange={() => setModelChoice('local')} />
-                GPT-Neo (Local)
-              </label>
+              <label><input type="radio" value="gemini" checked={modelChoice === 'gemini'} onChange={() => setModelChoice('gemini')} /> Gemini API (Cloud)</label>
+              <label><input type="radio" value="local" checked={modelChoice === 'local'} onChange={() => setModelChoice('local')} /> GPT-Neo (Local)</label>
             </div>
             <div className="chat-container">
               <ChatWindow messages={messages} />
-              <ChatInput onSendMessage={handleSendMessage} isLoading={isLoading} disabled={!tabularData} />
+              <ChatInput onSendMessage={handleSendMessage} isLoading={isLoading} disabled={!rawData} />
             </div>
           </motion.div>
 
@@ -115,24 +136,26 @@ function MainCanvas({ setAiStatus }: MainCanvasProps) {
             </motion.div>
           )}
           
-          <motion.div className="card" variants={cardVariants} initial="hidden" animate="visible">
-              <div className="chart-controls">
-                <div className="select-wrapper">
-                  <label>X-Axis:</label>
-                  <select value={xAxis} onChange={(e) => setXAxis(e.target.value)}>
-                    {headers.map(h => <option key={h} value={h}>{h}</option>)}
-                  </select>
+          {numericDataForViz.length > 0 && (
+            <motion.div className="card" variants={cardVariants} initial="hidden" animate="visible">
+                <div className="chart-controls">
+                  <div className="select-wrapper">
+                    <label>X-Axis:</label>
+                    <select value={xAxis} onChange={(e) => setXAxis(e.target.value)}>
+                      {headers.map(h => <option key={h} value={h}>{h}</option>)}
+                    </select>
+                  </div>
+                  <div className="select-wrapper">
+                    <label>Y-Axis:</label>
+                    <select value={yAxis} onChange={(e) => setYAxis(e.target.value)}>
+                      {headers.map(h => <option key={h} value={h}>{h}</option>)}
+                    </select>
+                  </div>
                 </div>
-                <div className="select-wrapper">
-                  <label>Y-Axis:</label>
-                  <select value={yAxis} onChange={(e) => setYAxis(e.target.value)}>
-                    {headers.map(h => <option key={h} value={h}>{h}</option>)}
-                  </select>
-                </div>
-              </div>
-              <DataChart data={numericDataForViz} headers={headers} xAxisKey={xAxis} yAxisKey={yAxis} />
-              <DataTable data={numericDataForViz} headers={headers} anomalies={anomalies} />
-          </motion.div>
+                <DataChart data={numericDataForViz} headers={headers} xAxisKey={xAxis} yAxisKey={yAxis} />
+                <DataTable data={numericDataForViz} headers={headers} anomalies={anomalies} />
+            </motion.div>
+          )}
         </>
       )}
     </main>

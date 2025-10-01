@@ -326,3 +326,79 @@ select {
   background-color: var(--plasma-pink);
   color: white;
 }
+
+.data-health-report {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.data-health-report h2 .file-name {
+  color: var(--nebula-purple);
+  font-family: var(--font-mono);
+}
+
+.summary-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+}
+
+.summary-card {
+  background-color: #1a1a1a;
+  padding: 1.5rem;
+  border-radius: 8px;
+  text-align: center;
+  border: 1px solid #2d3748;
+}
+
+.summary-card h3 {
+  margin: 0 0 0.5rem 0;
+  color: #aaa;
+  font-size: 1rem;
+}
+
+.summary-card p {
+  margin: 0;
+  font-size: 2rem;
+  font-weight: 700;
+}
+
+.summary-card .score {
+  color: var(--aurora-green);
+}
+
+.warning {
+  color: var(--solar-orange);
+}
+
+.cleaning-plan {
+  background-color: #1a1a1a;
+  padding: 1.5rem;
+  border-radius: 8px;
+  border: 1px solid #2d3748;
+}
+
+.cleaning-plan ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.analyze-button {
+  padding: 1rem;
+  font-size: 1.25rem;
+  font-weight: 700;
+  background-color: var(--nebula-purple);
+  color: var(--stellar-white);
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.analyze-button:hover {
+  filter: brightness(1.2);
+}

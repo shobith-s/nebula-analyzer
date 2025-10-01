@@ -27,7 +27,7 @@ class ProfileRequest(BaseModel):
     tabular_data: List[List[Any]]
 
 class AnalysisRequest(BaseModel):
-    tabular_data: List[List[Any]] 
+    tabular_data: List[List[Any]]
     query: str
     model_choice: str = "gemini"
 
@@ -69,17 +69,21 @@ def profile_data(request: ProfileRequest):
         col_profile = {"column_name": col}
         
         # Data Type
-        col_type = pd.api.types.infer_dtype(df[col], skipna=True)
-        col_profile["data_type"] = col_type
+        # Convert to numeric, coercing errors, then infer dtype
+        numeric_col = pd.to_numeric(df[col], errors='coerce')
+        if numeric_col.notna().all(): # If all values are numbers
+            col_profile["data_type"] = "numerical"
+        else:
+            col_profile["data_type"] = "categorical"
+
 
         # Missing Values
-        missing_count = int(df[col].isnull().sum())
+        missing_count = int(df[col].isnull().sum() | pd.to_numeric(df[col], errors='coerce').isnull().sum())
         col_profile["missing_values"] = missing_count
         col_profile["missing_percentage"] = (missing_count / len(df)) * 100 if len(df) > 0 else 0
         
-        # Outlier Detection (for numeric columns)
-        numeric_col = pd.to_numeric(df[col], errors='coerce')
-        if not numeric_col.isnull().all():
+        # Outlier Detection (for numeric columns only)
+        if col_profile["data_type"] == "numerical":
             q1 = numeric_col.quantile(0.25)
             q3 = numeric_col.quantile(0.75)
             iqr = q3 - q1
@@ -87,6 +91,8 @@ def profile_data(request: ProfileRequest):
             upper_bound = q3 + 1.5 * iqr
             outliers = numeric_col[(numeric_col < lower_bound) | (numeric_col > upper_bound)]
             col_profile["outlier_count"] = len(outliers)
+        else:
+            col_profile["outlier_count"] = 0
         
         report["column_profiles"].append(col_profile)
         
@@ -96,12 +102,9 @@ def profile_data(request: ProfileRequest):
 # --- Main Analysis Endpoint (Unchanged for now) ---
 @app.post("/analyze", response_model=AnalysisResponse)
 def analyze_data(request: AnalysisRequest):
-    # This function's logic remains the same as before
-    # ...
-    # (The code from the previous working version goes here)
-    # ...
-    # For brevity, I'm omitting the full code, but it is unchanged.
-    # Just ensure the rest of your analyze_data function from the last step is here.
+    # This function's logic is temporarily simplified to prevent crashes.
+    # We will fully restore it in the next phase.
+    print("\n--- Received request for analysis (placeholder) ---")
     return {"insight": "Analysis placeholder", "feature_importances": [], "anomalies": []}
 
 
