@@ -6,7 +6,6 @@ from typing import List, Dict, Any
 from fastapi.middleware.cors import CORSMiddleware
 
 from nebula.core.architectures import NEBULABrain
-from nebula.core.models import VAE # This is no longer used but we can keep the file
 
 app = FastAPI(title="NEBULABrain API (Structured Data)")
 
@@ -37,7 +36,6 @@ print("Startup complete. NEBULA is ready.")
 # --- API Endpoints ---
 @app.post("/profile-data")
 def profile_data(request: ProfileRequest):
-    # ... (This function is unchanged)
     if not request.tabular_data or len(request.tabular_data) < 2: raise HTTPException(status_code=400, detail="Incomplete data.")
     headers, data_rows = request.tabular_data[0], request.tabular_data[1:]
     df = pd.DataFrame(data_rows, columns=headers)
@@ -76,35 +74,35 @@ def analyze_data(request: AnalysisRequest):
     
     stats_summary = numeric_df.describe().to_string()
     
-    # --- TabNet Specific Training ---
-    # TabNet needs to predict one column from the others. We'll pick the last column as the target.
-    if numeric_df.shape[1] < 2: raise HTTPException(status_code=400, detail="TabNet requires at least 2 numeric columns.")
+    if numeric_df.shape[1] < 2: raise HTTPException(status_code=400, detail="TabNet requires at least 2 numeric columns for this setup.")
     
-    X_train = numeric_df.iloc[:, :-1].values
-    y_train = numeric_df.iloc[:, -1].values.reshape(-1, 1)
+    # --- FINAL CLEANING FOR TABNET ---
+    # Drop any rows that *still* have NaN values after our processing
+    final_df = numeric_df.dropna()
+    if len(final_df) < 2: raise HTTPException(status_code=400, detail="Not enough clean data rows to perform an analysis.")
+
+    X_train = final_df.iloc[:, :-1].values
+    y_train = final_df.iloc[:, -1].values.reshape(-1, 1)
+    # -------------------------------
     
-    brain.train(X_tabular=X_train, y_tabular=y_train, epochs=25)
+    brain.train(X_tabular=X_train, y_tabular=y_train)
     
-    # --- XAI with TabNet's built-in attribute ---
     importances = brain.get_feature_importances()
-    feature_headers = numeric_df.columns[:-1].tolist()
+    feature_headers = final_df.columns[:-1].tolist()
     formatted_importances = [{"name": h, "importance": float(imp)} for h, imp in zip(feature_headers, importances)]
     xai_summary = "Feature importance analysis shows the top 3 most influential columns are: " + ", ".join([f"'{item['name']}'" for item in sorted(formatted_importances, key=lambda x: x['importance'], reverse=True)[:3]]) + "."
     
-    # Anomaly detection is not used in this version
     anomaly_summary, anomaly_indices = "Not performed in this analysis.", []
-    
-    # Trend analysis is also not the primary focus, but we can keep a simplified version
-    trend_summary = "Trend analysis was not the primary focus."
+    trend_summary = "Not performed in this analysis."
 
     insight = brain.think(
-        tabular_data=None, # We don't need to pass the raw data anymore
         query=request.query, model_choice=request.model_choice,
         stats_summary=stats_summary, trend_summary=trend_summary, 
         anomaly_summary=anomaly_summary, xai_summary=xai_summary
     )
     
     return {"insight": insight, "feature_importances": formatted_importances, "anomalies": anomaly_indices}
+
 
 @app.get("/memory", response_model=MemoryResponse)
 def get_memory():
