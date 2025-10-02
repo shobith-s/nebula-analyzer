@@ -57,7 +57,7 @@ def profile_data(request: ProfileRequest):
 
 @app.post("/analyze", response_model=AnalysisResponse)
 def analyze_data(request: AnalysisRequest):
-    print("\n--- Starting Full Analysis Pipeline with TabNet ---")
+    print("\n--- Starting Full Analysis Pipeline with TabNet Pre-training ---")
     if not request.tabular_data or len(request.tabular_data) < 2: raise HTTPException(status_code=400, detail="Incomplete data.")
     headers, data_rows = request.tabular_data[0], request.tabular_data[1:]
     df = pd.DataFrame(data_rows, columns=headers)
@@ -74,21 +74,18 @@ def analyze_data(request: AnalysisRequest):
     
     stats_summary = numeric_df.describe().to_string()
     
-    if numeric_df.shape[1] < 2: raise HTTPException(status_code=400, detail="TabNet requires at least 2 numeric columns for this setup.")
-    
-    # --- FINAL CLEANING FOR TABNET ---
-    # Drop any rows that *still* have NaN values after our processing
+    # --- Data Prep for TabNet Pretrainer ---
+    # Drop any remaining NaN rows and convert to numpy array
     final_df = numeric_df.dropna()
     if len(final_df) < 2: raise HTTPException(status_code=400, detail="Not enough clean data rows to perform an analysis.")
 
-    X_train = final_df.iloc[:, :-1].values
-    y_train = final_df.iloc[:, -1].values.reshape(-1, 1)
-    # -------------------------------
+    X_train = final_df.values
+    # ------------------------------------
     
-    brain.train(X_tabular=X_train, y_tabular=y_train)
+    brain.train(X_tabular=X_train)
     
     importances = brain.get_feature_importances()
-    feature_headers = final_df.columns[:-1].tolist()
+    feature_headers = final_df.columns.tolist()
     formatted_importances = [{"name": h, "importance": float(imp)} for h, imp in zip(feature_headers, importances)]
     xai_summary = "Feature importance analysis shows the top 3 most influential columns are: " + ", ".join([f"'{item['name']}'" for item in sorted(formatted_importances, key=lambda x: x['importance'], reverse=True)[:3]]) + "."
     
