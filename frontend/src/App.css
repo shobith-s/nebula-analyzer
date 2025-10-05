@@ -628,3 +628,186 @@ th {
 .sidebar-toggle:hover {
   border-color: var(--nebula-purple);
 }
+
+/* ===== Cosmic Theme Layers ===== */
+.app-container {
+  position: relative;
+  isolation: isolate;
+}
+
+.bg-canvas {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0.85;
+  mix-blend-mode: screen;
+}
+
+.header,
+.sidebar,
+.main-canvas,
+.card,
+.panel {
+  position: relative;
+  z-index: 1;
+}
+
+/* Glass & holo styles */
+.glass {
+  background: rgba(15, 17, 21, 0.55);
+  backdrop-filter: blur(12px) saturate(120%);
+  -webkit-backdrop-filter: blur(12px) saturate(120%);
+}
+
+.holo-border {
+  border: 1px solid rgba(120, 140, 255, 0.22);
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.3) inset,
+    0 8px 40px rgba(40, 200, 150, 0.06),
+    0 0 60px rgba(110, 60, 220, 0.08);
+}
+
+/* Brand */
+.brand {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-right: 12px;
+}
+
+.brand-core {
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  background: linear-gradient(90deg, #9d7bff 0%, #7ef0c6 55%, #8de0ff 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  text-shadow: 0 0 30px rgba(125, 200, 255, 0.25);
+}
+
+.brand-sub {
+  color: #a9b7c9;
+  font-size: 12px;
+  letter-spacing: .05em;
+  opacity: .9;
+}
+
+.header-spacer {
+  flex: 1;
+}
+
+.header-label {
+  color: #a6b3c6;
+  margin-right: 8px;
+}
+
+/* Sidebar rail */
+.sidebar {
+  background: rgba(18, 20, 26, 0.55);
+}
+
+.sidebar-link {
+  border: 1px solid rgba(120, 140, 255, 0.08);
+}
+
+.sidebar-link:hover {
+  background: rgba(99, 102, 241, 0.15);
+}
+
+/* Quick actions */
+.quick-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.chip {
+  border-radius: 9999px;
+  padding: 6px 12px;
+  font-size: 12px;
+  border: 1px solid rgba(120, 140, 255, 0.24);
+  background: rgba(14, 16, 22, 0.6);
+  color: #dfe9ff;
+  cursor: pointer;
+  user-select: none;
+}
+
+.chip:disabled {
+  opacity: .6;
+  cursor: default;
+}
+
+.neon-chip:hover {
+  box-shadow: 0 0 0 2px rgba(26, 165, 121, 0.12), 0 0 18px rgba(26, 165, 121, 0.28);
+  border-color: rgba(26, 165, 121, 0.6);
+}
+
+/* Glance bar (KPIs) */
+.glance-bar {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.glance-card {
+  border: 1px dashed rgba(120, 140, 255, 0.24);
+  border-radius: 10px;
+  padding: 8px 10px;
+  background: rgba(16, 18, 24, 0.4);
+}
+
+.glance-card .k {
+  font-size: 11px;
+  color: #9fb0c9;
+  letter-spacing: .04em;
+}
+
+.glance-card .v {
+  font-size: 18px;
+  font-weight: 700;
+  color: #e9f4ff;
+}
+
+/* Results card look & tabs header */
+.results-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 4px 10px 2px;
+  border-bottom: 1px dashed rgba(255, 255, 255, 0.08);
+  color: #dfe8f6;
+  position: sticky;
+  top: 0;
+  background: rgba(14, 16, 22, 0.6);
+  backdrop-filter: blur(8px);
+}
+
+.pill {
+  font-size: 11px;
+  border-radius: 9999px;
+  padding: 2px 8px;
+  border: 1px solid #2d3748;
+}
+
+.pill-live {
+  color: #7bf0c9;
+  border-color: #1f8f6b;
+  background: rgba(26, 165, 121, .08);
+}
+
+/* Console tweaks on glass */
+.console-window {
+  background: rgba(10, 12, 16, 0.65);
+  border: 1px solid rgba(120, 140, 255, 0.18);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.3);
+  border-radius: 12px;
+}
+
+/* Ensure main panels look glassy */
+.panel,
+.card {
+  background: rgba(15, 17, 21, 0.52);
+}

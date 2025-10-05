@@ -12,30 +12,20 @@ interface HeaderProps {
 const Header: React.FC<HeaderProps> = ({ status, onToggleSidebar, sidebarOpen }) => {
   const getStatusText = () => {
     switch (status) {
-      case 'thinking':
-        return 'Thinking...';
-      case 'success':
-        return 'Insight Generated';
-      case 'error':
-        return 'Error Occurred';
-      case 'idle':
-      default:
-        return 'Ready for Analysis';
+      case 'thinking': return 'Thinking...';
+      case 'success':  return 'Insight Generated';
+      case 'error':    return 'Error Occurred';
+      default:         return 'Ready for Analysis';
     }
   };
 
   const pulseVariants = {
-    pulsing: {
-      scale: [1, 1.05, 1],
-      opacity: [0.7, 1, 0.7],
-      transition: { duration: 1.5, repeat: Infinity, ease: 'easeInOut' }
-    },
+    pulsing: { scale: [1, 1.05, 1], opacity: [0.7, 1, 0.7], transition: { duration: 1.5, repeat: Infinity, ease: 'easeInOut' } },
     idle: { scale: 1, opacity: 1 }
   };
 
   return (
-    <header className="header">
-      {/* Sidebar toggle */}
+    <header className="header glass holo-border">
       <button
         className="sidebar-toggle"
         onClick={onToggleSidebar}
@@ -45,9 +35,14 @@ const Header: React.FC<HeaderProps> = ({ status, onToggleSidebar, sidebarOpen })
         <VscMenu size={18} />
       </button>
 
-      <span>NEBULA Neural Status:</span>
+      <div className="brand">
+        <span className="brand-core">NEBULA</span>
+        <span className="brand-sub">Analyzer</span>
+      </div>
 
-      {/* Status chip with pulse when thinking */}
+      <div className="header-spacer" />
+
+      <span className="header-label">Neural Status</span>
       <motion.div
         className={`status-indicator ${status}`}
         variants={pulseVariants}
