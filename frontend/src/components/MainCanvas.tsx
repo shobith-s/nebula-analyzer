@@ -1,26 +1,29 @@
-import { useState, useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import axios from 'axios';
 import { motion } from 'framer-motion';
-import DataTable from './DataTable';
-import DataChart from './DataChart';
-import FeatureImportanceChart from './FeatureImportanceChart';
-import ChatInput from './ChatInput';
-import ChatWindow, { type Message } from './ChatWindow';
+
 import FileUploadZone from './FileUploadZone';
 import DataHealthReport, { type CleaningChoices } from './DataHealthReport';
-import { type AIStatus, type ImportanceData } from '../types';
+import ChatWindow from './ChatWindow';
+import ChatInput from './ChatInput';
+import ResultsPanel from './ResultsPanel';
+
+import { type AIStatus, type Message } from '../types';
 
 interface MainCanvasProps {
   setAiStatus: (status: AIStatus) => void;
 }
 
-// Define the types for the health report
+// Types for the health report
 interface ColumnProfile {
-  column_name: string; data_type: string; missing_values: number;
-  missing_percentage: number; outlier_count: number;
+  column_name: string;
+  data_type: string;
+  missing_values: number;
+  missing_percentage: number;
+  outlier_count: number;
 }
 interface HealthReport {
-  general_stats: { total_rows: number; duplicate_rows: number; };
+  general_stats: { total_rows: number; duplicate_rows: number };
   column_profiles: ColumnProfile[];
 }
 
@@ -32,28 +35,66 @@ function MainCanvas({ setAiStatus }: MainCanvasProps) {
   const [healthReport, setHealthReport] = useState<HealthReport | null>(null);
   const [cleaningChoices, setCleaningChoices] = useState<CleaningChoices | null>(null);
 
-  const [featureImportances, setFeatureImportances] = useState<ImportanceData[] | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [xAxis, setXAxis] = useState<string>('');
-  const [yAxis, setYAxis] = useState<string>('');
   const [modelChoice, setModelChoice] = useState<'gemini' | 'local'>('gemini');
-  const [anomalies, setAnomalies] = useState<number[]>([]);
+  const [outputs, setOutputs] = useState<any[]>([]); // results from backend (tables, heatmaps, etc.)
+  const [newBadge, setNewBadge] = useState(false);
 
-  const handleFileParsed = async (data: string[][], headers: string[], fileName: string) => {
+  const cardVariants = {
+    hidden: { opacity: 0, y: 20 },
+    visible: { opacity: 1, y: 0, transition: { duration: 0.5 } },
+  };
+
+  const lastInsight = useMemo(() => {
+    for (let i = messages.length - 1; i >= 0; i--) {
+      if (messages[i].sender === 'ai') return messages[i].text;
+    }
+    return null;
+  }, [messages]);
+
+  // Build quick actions based on known headers
+  const quickActions = useMemo(() => {
+    const lower = new Set(headers.map(h => h.toLowerCase()));
+    const has = (name: string) => lower.has(name.toLowerCase());
+
+    const actions: { label: string; query: string }[] = [
+      { label: 'Summary', query: 'summary' },
+      { label: 'Correlation', query: 'correlation heatmap' },
+    ];
+
+    if (has('Department')) {
+      actions.push({ label: 'Count by Department', query: 'count by Department' });
+    }
+    if (has('Salary')) {
+      actions.push({ label: 'Top 5 by Salary', query: 'top 5 rows by Salary' });
+    }
+    if (has('Salary') && has('Department')) {
+      actions.push({ label: 'Mean Salary by Department', query: 'mean Salary by Department' });
+    }
+    if (has('PerformanceScore') && has('Department')) {
+      actions.push({
+        label: 'Count Dept (Score ≥ 4.5)',
+        query: 'count by Department where PerformanceScore >= 4.5',
+      });
+    }
+    return actions;
+  }, [headers]);
+
+  const handleFileParsed = async (data: string[][], hdrs: string[], name: string) => {
     setRawData(data);
-    setHeaders(headers);
-    setFileName(fileName);
+    setHeaders(hdrs);
+    setFileName(name);
     setView('profile');
 
     try {
       const response = await axios.post('http://127.0.0.1:8000/profile-data', {
-        tabular_data: [headers, ...data]
+        tabular_data: [hdrs, ...data],
       });
       setHealthReport(response.data);
     } catch (error) {
-      console.error("Failed to profile data:", error);
-      alert("Could not generate a data health report.");
+      console.error('Failed to profile data:', error);
+      alert('Could not generate a data health report.');
       setView('upload');
     }
   };
@@ -61,49 +102,61 @@ function MainCanvas({ setAiStatus }: MainCanvasProps) {
   const proceedToAnalysis = (choices: CleaningChoices) => {
     setCleaningChoices(choices);
     setView('analysis');
-    setMessages([{ sender: 'ai', text: `Successfully loaded and profiled ${fileName}. Cleaning plan approved. What would you like to know?` }]);
+    setMessages([
+      {
+        sender: 'ai',
+        text: `Successfully loaded and profiled ${fileName}. Cleaning plan approved.\nAsk a question to generate insights…`,
+      },
+    ]);
+    setOutputs([]);
+    setNewBadge(false);
   };
 
   const handleSendMessage = async (query: string) => {
-    if (!rawData || !headers) { return; }
-    
-    setMessages(prevMessages => [...prevMessages, { sender: 'user', text: query }]);
+    if (!rawData || !headers) return;
+
+    setMessages(prev => [...prev, { sender: 'user', text: query }]);
     setIsLoading(true);
     setAiStatus('thinking');
-    setFeatureImportances(null);
-    setAnomalies([]);
 
-    const requestData = {
+    const payload = {
       tabular_data: [headers, ...rawData],
-      query: query,
+      message: query,
       model_choice: modelChoice,
-      cleaning_choices: cleaningChoices,
+      narrative_mode: 'hybrid',
+      // cleaning choices already applied server-side if needed
     };
 
     try {
-      const apiUrl = 'http://127.0.0.1:8000/analyze';
-      const response = await axios.post(apiUrl, requestData);
-      setMessages(prevMessages => [...prevMessages, { sender: 'ai', text: response.data.insight }]);
-      setFeatureImportances(response.data.feature_importances);
-      setAnomalies(response.data.anomalies);
+      const { data } = await axios.post('http://127.0.0.1:8000/chat', payload);
+      const insight = data?.outputs?.[0]?.data?.markdown ?? 'Done.';
+      setMessages(prev => [...prev, { sender: 'ai', text: insight }]);
+
+      // keep all payloads except the first Insight text block
+      const rest = (data?.outputs || []).filter(
+        (o: any) => !(o.type === 'text' && o.title === 'Insight')
+      );
+      setOutputs(rest);
+
+      // flash "new" badge briefly
+      setNewBadge(true);
+      window.setTimeout(() => setNewBadge(false), 2500);
+
       setAiStatus('success');
-    } catch (error) {
-      const errorMsg = axios.isAxiosError(error) && error.response ? `Error from server: ${error.response.data.detail}` : 'Sorry, an error occurred while talking to the brain.';
-      setMessages(prevMessages => [...prevMessages, { sender: 'ai', text: errorMsg }]);
+    } catch (err: unknown) {
+      const msg =
+        axios.isAxiosError(err) && err.response
+          ? `Error from server: ${err.response.data.detail}`
+          : 'Sorry, an error occurred while talking to the brain.';
+      setMessages(prev => [...prev, { sender: 'ai', text: msg }]);
       setAiStatus('error');
     } finally {
       setIsLoading(false);
     }
   };
 
-  const numericDataForViz = useMemo(() => {
-    if (!rawData) return [];
-    return rawData.map(row => row.map(Number)).filter(row => row.every(val => !isNaN(val)));
-  }, [rawData]);
-
-  const cardVariants = {
-    hidden: { opacity: 0, y: 20 },
-    visible: { opacity: 1, y: 0, transition: { duration: 0.5 } },
+  const handleQuickAction = (query: string) => {
+    if (!isLoading) handleSendMessage(query);
   };
 
   return (
@@ -117,48 +170,75 @@ function MainCanvas({ setAiStatus }: MainCanvasProps) {
       {view === 'profile' && (
         <DataHealthReport report={healthReport} fileName={fileName} onProceed={proceedToAnalysis} />
       )}
-      
+
       {view === 'analysis' && (
-        <>
-          <motion.div className="card" variants={cardVariants} initial="hidden" animate="visible">
+        <div className="analysis-grid">
+          {/* LEFT: console panel (sticky) */}
+          <div className="panel panel-sticky">
             <div className="model-selector">
               <span>Select AI Engine:</span>
-              <label><input type="radio" value="gemini" checked={modelChoice === 'gemini'} onChange={() => setModelChoice('gemini')} /> Gemini API (Cloud)</label>
-              <label><input type="radio" value="local" checked={modelChoice === 'local'} onChange={() => setModelChoice('local')} /> GPT-Neo (Local)</label>
+              <label>
+                <input
+                  type="radio"
+                  value="gemini"
+                  checked={modelChoice === 'gemini'}
+                  onChange={() => setModelChoice('gemini')}
+                />{' '}
+                Gemini API (Cloud)
+              </label>
+              <label>
+                <input
+                  type="radio"
+                  value="local"
+                  checked={modelChoice === 'local'}
+                  onChange={() => setModelChoice('local')}
+                />{' '}
+                GPT-Neo (Local)
+              </label>
             </div>
-            <div className="chat-container">
-              <ChatWindow messages={messages} />
-              <ChatInput onSendMessage={handleSendMessage} isLoading={isLoading} disabled={!rawData} />
-            </div>
-          </motion.div>
 
-          {featureImportances && (
-            <motion.div className="card" variants={cardVariants} initial="hidden" animate="visible">
-                <FeatureImportanceChart data={featureImportances} />
-            </motion.div>
-          )}
-          
-          {rawData && (
-            <motion.div className="card" variants={cardVariants} initial="hidden" animate="visible">
-                <div className="chart-controls">
-                  <div className="select-wrapper">
-                    <label>X-Axis:</label>
-                    <select value={xAxis} onChange={(e) => setXAxis(e.target.value)}>
-                      {headers.map(h => <option key={h} value={h}>{h}</option>)}
-                    </select>
-                  </div>
-                  <div className="select-wrapper">
-                    <label>Y-Axis:</label>
-                    <select value={yAxis} onChange={(e) => setYAxis(e.target.value)}>
-                      {headers.map(h => <option key={h} value={h}>{h}</option>)}
-                    </select>
-                  </div>
-                </div>
-                <DataChart data={numericDataForViz} headers={headers} xAxisKey={xAxis} yAxisKey={yAxis} />
-                <DataTable data={numericDataForViz} headers={headers} anomalies={anomalies} />
-            </motion.div>
-          )}
-        </>
+            {/* Quick actions */}
+            {quickActions.length > 0 && (
+              <div className="quick-actions" style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                {quickActions.map((a, idx) => (
+                  <button
+                    key={idx}
+                    onClick={() => handleQuickAction(a.query)}
+                    disabled={isLoading || !rawData}
+                    title={a.query}
+                  >
+                    {a.label}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* Sticky latest insight header */}
+            {lastInsight && (
+              <div className="insight-sticky">
+                <div className="insight-title">Latest Insight</div>
+                <div className="insight-body">{lastInsight}</div>
+              </div>
+            )}
+
+            {/* Console */}
+            <div className="console-container">
+              <ChatWindow messages={messages} />
+              <div className="console-input">
+                <ChatInput onSendMessage={handleSendMessage} isLoading={isLoading} disabled={!rawData} />
+              </div>
+            </div>
+          </div>
+
+          {/* RIGHT: results (heatmaps, tables, notes) */}
+          <div className="panel results-panel-scroll">
+            <div className="results-header">
+              <span>Results</span>
+              {newBadge ? <span className="pill pill-live">● new</span> : null}
+            </div>
+            <ResultsPanel outputs={outputs} />
+          </div>
+        </div>
       )}
     </main>
   );

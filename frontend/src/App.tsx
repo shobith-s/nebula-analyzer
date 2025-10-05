@@ -7,11 +7,16 @@ import { type AIStatus } from './types';
 
 function App() {
   const [aiStatus, setAiStatus] = useState<AIStatus>('idle');
+  const [sidebarOpen, setSidebarOpen] = useState(true);
 
   return (
-    <div className="app-container">
-      <Header status={aiStatus} />
-      <Sidebar />
+    <div className={`app-container ${sidebarOpen ? 'sidebar-open' : 'sidebar-collapsed'}`}>
+      <Header
+        status={aiStatus}
+        onToggleSidebar={() => setSidebarOpen((s) => !s)}
+        sidebarOpen={sidebarOpen}
+      />
+      <Sidebar collapsed={!sidebarOpen} />
       <MainCanvas setAiStatus={setAiStatus} />
     </div>
   );
