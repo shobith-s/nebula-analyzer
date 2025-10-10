@@ -1,42 +1,54 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { type AIStatus } from '../types';
-import { VscThreeBars } from 'react-icons/vsc';
+
+export type AIStatus = 'idle' | 'thinking' | 'success' | 'error';
 
 interface HeaderProps {
   status: AIStatus;
-  onToggleSidebar?: () => void;
+  onToggleSidebar: () => void;
 }
 
 const Header: React.FC<HeaderProps> = ({ status, onToggleSidebar }) => {
-  const getStatusText = () => {
-    switch (status) {
-      case 'thinking': return 'Thinking...';
-      case 'success':  return 'Insight Generated';
-      case 'error':    return 'Error Occurred';
-      default:         return 'Ready for Analysis';
-    }
-  };
+  const statusText =
+    status === 'thinking'
+      ? 'Thinking...'
+      : status === 'success'
+      ? 'Insight Generated'
+      : status === 'error'
+      ? 'Error Occurred'
+      : 'Ready for Analysis';
 
-  const pulse = {
-    pulsing: { scale: [1, 1.05, 1], opacity: [0.7, 1, 0.7], transition: { duration: 1.5, repeat: Infinity, ease: 'easeInOut' } },
-    idle: { scale: 1, opacity: 1 }
+  const pulseVariants = {
+    pulsing: {
+      scale: [1, 1.05, 1],
+      opacity: [0.7, 1, 0.7],
+      transition: { duration: 1.5, repeat: Infinity, ease: 'easeInOut' },
+    },
+    idle: { scale: 1, opacity: 1 },
   };
 
   return (
-    <header className="nb-header">
-      <button className="hd-toggle" aria-label="Toggle sidebar" onClick={onToggleSidebar}>
-        <VscThreeBars size={18} />
+    <header className="header">
+      <button
+        className="icon-button"
+        aria-label="Toggle sidebar"
+        onClick={onToggleSidebar}
+      >
+        <span className="hamburger" />
       </button>
 
-      <div className="hd-spacer" />
+      <div className="brand">
+        <span className="brand-name">NEBULA</span>
+        <span className="brand-suffix">Analyzer</span>
+        <span className="brand-version">v0.1</span>
+      </div>
 
       <motion.div
-        className={`status-pill ${status}`}
-        variants={pulse}
+        className={`status-indicator ${status}`}
+        variants={pulseVariants}
         animate={status === 'thinking' ? 'pulsing' : 'idle'}
       >
-        {getStatusText()}
+        {statusText}
       </motion.div>
     </header>
   );

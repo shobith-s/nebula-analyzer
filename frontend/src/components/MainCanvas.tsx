@@ -1,304 +1,186 @@
-import { useMemo, useState } from "react";
-import axios from "axios";
-import { motion } from "framer-motion";
-import DataTable from "./DataTable";
-import DataChart from "./DataChart";
-import FeatureImportanceChart from "./FeatureImportanceChart";
-import ChatInput from "./ChatInput";
-import ChatWindow from "./ChatWindow";
-import FileUploadZone from "./FileUploadZone";
-import DataHealthReport from "./DataHealthReport";
-import { type AIStatus, type ImportanceData } from "../types";
+import React, { useMemo, useState } from 'react';
+import FileUploadZone from './FileUploadZone';
+import DataHealthReport from './DataHealthReport';
+import ResultsPanel from './ResultsPanel';
+import ChatWindow from './ChatWindow';
+import Header from './Header';
+import { type AIStatus } from '../types';
 
-type View = "upload" | "profile" | "analysis";
+type Phase = 'idle' | 'profile' | 'analyze';
 
-interface MainCanvasProps {
-  setAiStatus: (status: AIStatus) => void;
-}
+const MainCanvas: React.FC = () => {
+  const [status, setStatus] = useState<AIStatus>('idle');
+  const [phase, setPhase] = useState<Phase>('idle');
 
-interface Message {
-  sender: "user" | "ai";
-  text: string;
-}
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [fileName, setFileName] = useState<string | null>(null);
 
-interface ColumnProfile {
-  column_name: string;
-  data_type: string;
-  missing_values: number;
-  missing_percentage: number;
-  outlier_count: number;
-}
-interface HealthReport {
-  general_stats: { total_rows: number; duplicate_rows: number };
-  column_profiles: ColumnProfile[];
-}
+  // Data returned by /profile-data
+  const [profile, setProfile] = useState<any | null>(null);
 
-export type CleaningChoices = {
-  removeDuplicates: boolean;
-  fillMissing: boolean;
-};
+  const resetErrors = () => setUploadError(null);
 
-export default function MainCanvas({ setAiStatus }: MainCanvasProps) {
-  const [view, setView] = useState<View>("upload");
-
-  // data state
-  const [rawData, setRawData] = useState<string[][] | null>(null);
-  const [headers, setHeaders] = useState<string[]>([]);
-  const [fileName, setFileName] = useState<string>("");
-
-  // profiling
-  const [healthReport, setHealthReport] = useState<HealthReport | null>(null);
-  const [cleaningChoices, setCleaningChoices] = useState<CleaningChoices | null>(null);
-
-  // analysis state
-  const [featureImportances, setFeatureImportances] = useState<ImportanceData[] | null>(null);
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [modelChoice, setModelChoice] = useState<"gemini" | "local">("gemini");
-  const [anomalies, setAnomalies] = useState<number[]>([]);
-  const [xAxis, setXAxis] = useState<string>("");
-  const [yAxis, setYAxis] = useState<string>("");
-
-  // ---------- Upload flow ----------
-  const handleFileParsed = async (data: string[][], hdrs: string[], fname: string) => {
-    setRawData(data);
-    setHeaders(hdrs);
-    setFileName(fname);
-    setView("profile");
+  const handleUploadParsed = async (
+    rows: string[][],
+    headers: string[],
+    filename: string
+  ) => {
+    resetErrors();
+    setStatus('thinking');
+    setFileName(filename);
 
     try {
-      const response = await axios.post("http://127.0.0.1:8000/profile-data", {
-        tabular_data: [hdrs, ...data],
+      // IMPORTANT: match backend schema
+      const payload = {
+        filename,
+        tabular_data: {
+          headers,
+          rows,
+        },
+      };
+
+      const res = await fetch('/profile-data', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
       });
-      setHealthReport(response.data);
-    } catch (err) {
-      console.error("profile-data failed:", err);
-      alert("Could not generate a data health report.");
-      setView("upload");
-    }
-  };
 
-  // ---------- Profile → Analysis ----------
-  const proceedToAnalysis = (choices: CleaningChoices) => {
-    setCleaningChoices(choices);
-    setMessages([
-      {
-        sender: "ai",
-        text: `Successfully loaded and profiled ${fileName}. Cleaning plan approved. Ask a question to generate insights...`,
-      },
-    ]);
-    setView("analysis");
-  };
+      if (!res.ok) {
+        // try to read json; fall back to text
+        let message = `Server returned ${res.status}`;
+        try {
+          const j = await res.json();
+          message = typeof j === 'string' ? j : JSON.stringify(j, null, 2);
+        } catch {
+          try {
+            message = await res.text();
+          } catch {
+            /* no-op */
+          }
+        }
+        throw new Error(message);
+      }
 
-  // ---------- Chat submit ----------
-  const handleSendMessage = async (query: string) => {
-    if (!rawData || !headers) return;
-    setMessages((m) => [...m, { sender: "user", text: query }]);
-    setIsLoading(true);
-    setAiStatus("thinking");
-    setFeatureImportances(null);
-    setAnomalies([]);
-
-    const requestData = {
-      tabular_data: [headers, ...rawData],
-      query,
-      model_choice: modelChoice,
-      cleaning_choices: cleaningChoices,
-    };
-
-    try {
-      const { data } = await axios.post("http://127.0.0.1:8000/analyze", requestData);
-      setMessages((m) => [...m, { sender: "ai", text: data.insight }]);
-      setFeatureImportances(data.feature_importances);
-      setAnomalies(data.anomalies);
-      setAiStatus("success");
+      const data = await res.json();
+      setProfile(data);
+      setPhase('profile');
+      setStatus('success');
     } catch (err: any) {
-      const msg =
-        axios.isAxiosError(err) && err.response
-          ? `Error from server: ${err.response.data.detail}`
-          : "Sorry, an error occurred while talking to the brain.";
-      setMessages((m) => [...m, { sender: "ai", text: msg }]);
-      setAiStatus("error");
-    } finally {
-      setIsLoading(false);
+      setUploadError(
+        `Upload failed\n${typeof err?.message === 'string' ? err.message : String(err)}`
+      );
+      setStatus('error');
     }
   };
 
-  // ---------- Derived ----------
-  const numericDataForViz = useMemo(() => {
-    if (!rawData) return [];
-    return rawData
-      .map((row) => row.map(Number))
-      .filter((row) => row.every((v) => !Number.isNaN(v)));
-  }, [rawData]);
-
-  // ---------- UI ----------
-  const panelVariants = {
-    hidden: { opacity: 0, y: 8 },
-    visible: { opacity: 1, y: 0, transition: { duration: 0.35 } },
-  };
+  const headerStatus = useMemo<AIStatus>(() => status, [status]);
 
   return (
-    <main className="main-canvas">
-      {/* UPLOAD VIEW */}
-      {view === "upload" && (
-        <motion.section
-          className="panel glass holo-border upload-shell"
-          variants={panelVariants}
-          initial="hidden"
-          animate="visible"
-        >
-          <div className="upload-card">
-            <FileUploadZone onFileParsed={handleFileParsed} />
+    <div className="app-container">
+      <Header status={headerStatus} />
+
+      {/* Left rail (toggle button lives in Header in your codebase; the rail itself is Sidebar.tsx) */}
+      {/* Sidebar is already rendered outside or via parent layout. */}
+
+      <main className="main-canvas">
+        {/* Welcome / quick-hints capsule */}
+        <section className="panel glass holo-border" style={{ padding: 16 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <strong>Welcome to NEBULA</strong>
+            <span
+              style={{
+                fontSize: 10,
+                padding: '2px 6px',
+                borderRadius: 999,
+                background: 'rgba(129,140,248,.12)',
+                border: '1px solid rgba(129,140,248,.25)',
+              }}
+            >
+              v0.1
+            </span>
           </div>
-        </motion.section>
-      )}
 
-      {/* PROFILE VIEW (scrolls safely inside itself) */}
-      {view === "profile" && (
-        <motion.section
-          className="panel glass holo-border profile-panel-scroll"
-          variants={panelVariants}
-          initial="hidden"
-          animate="visible"
-        >
-          <DataHealthReport report={healthReport} fileName={fileName} onProceed={proceedToAnalysis} />
-        </motion.section>
-      )}
+          <div style={{ marginTop: 8, fontSize: 12, opacity: 0.85 }}>
+            Drop a CSV to get a quality report and ask questions like:
+          </div>
 
-      {/* ANALYSIS VIEW */}
-      {view === "analysis" && (
-        <section className="analysis-grid">
-          {/* LEFT: Console column */}
-          <motion.div
-            className="panel glass holo-border console-col"
-            variants={panelVariants}
-            initial="hidden"
-            animate="visible"
-          >
-            {/* model selector */}
-            <div className="model-selector">
-              <span>AI Engine:</span>
-              <label>
-                <input
-                  type="radio"
-                  value="gemini"
-                  checked={modelChoice === "gemini"}
-                  onChange={() => setModelChoice("gemini")}
-                />
-                Gemini API (Cloud)
-              </label>
-              <label>
-                <input
-                  type="radio"
-                  value="local"
-                  checked={modelChoice === "local"}
-                  onChange={() => setModelChoice("local")}
-                />
-                GPT-Neo (Local)
-              </label>
-            </div>
-
-            {/* quick-actions */}
-            <div className="quickbar">
-              <button onClick={() => handleSendMessage("summary")} className="chip">
-                Summary
-              </button>
-              <button onClick={() => handleSendMessage("correlation heatmap")} className="chip">
-                Correlation
-              </button>
-              <button
-                onClick={() => handleSendMessage("top 5 by Salary")}
-                className="chip"
-              >
-                Top 5 by Salary
-              </button>
-              <button
-                onClick={() => handleSendMessage("count by Department")}
-                className="chip"
-              >
-                Count by Dept
-              </button>
-            </div>
-
-            {/* chat feed (independent scroll) */}
-            <div className="chat-window">
-              <ChatWindow messages={messages} />
-            </div>
-
-            {/* input (sticky to bottom of column; no overlap) */}
-            <div className="console-input">
-              <ChatInput
-                onSendMessage={handleSendMessage}
-                isLoading={isLoading}
-                disabled={!rawData}
-              />
-            </div>
-          </motion.div>
-
-          {/* RIGHT: Results column */}
-          <motion.div
-            className="panel glass holo-border results-panel"
-            variants={panelVariants}
-            initial="hidden"
-            animate="visible"
-          >
-            {/* feature importance */}
-            {featureImportances && featureImportances.length > 0 && (
-              <div className="block">
-                <h3 className="panel-title">Top Associations</h3>
-                <FeatureImportanceChart data={featureImportances} />
-              </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 10 }}>
+            {['summary', 'correlation', 'top 5 by Salary', 'mean of Age', 'count by Department where Score ≥ 4.5'].map(
+              (q) => (
+                <span
+                  key={q}
+                  style={{
+                    fontSize: 11,
+                    padding: '4px 8px',
+                    borderRadius: 999,
+                    background: 'rgba(255,255,255,.04)',
+                    border: '1px solid rgba(255,255,255,.08)',
+                  }}
+                >
+                  {q}
+                </span>
+              )
             )}
-
-            {/* simple numeric viz area */}
-            {rawData && (
-              <div className="block">
-                <div className="chart-controls">
-                  <div className="select-wrapper">
-                    <label>X:</label>
-                    <select value={xAxis} onChange={(e) => setXAxis(e.target.value)}>
-                      <option value="">(choose)</option>
-                      {headers.map((h) => (
-                        <option key={h} value={h}>
-                          {h}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="select-wrapper">
-                    <label>Y:</label>
-                    <select value={yAxis} onChange={(e) => setYAxis(e.target.value)}>
-                      <option value="">(choose)</option>
-                      {headers.map((h) => (
-                        <option key={h} value={h}>
-                          {h}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-                <DataChart data={numericDataForViz} />
-              </div>
-            )}
-
-            {/* table + anomalies */}
-            {numericDataForViz.length > 0 && (
-              <div className="block">
-                <h3 className="panel-title">Preview</h3>
-                <DataTable data={numericDataForViz} headers={headers} anomalies={anomalies} />
-              </div>
-            )}
-
-            {(!featureImportances || featureImportances.length === 0) &&
-              numericDataForViz.length === 0 && (
-                <div className="results-placeholder">
-                  <p>Ask a question to generate insights…</p>
-                </div>
-              )}
-          </motion.div>
+          </div>
         </section>
-      )}
-    </main>
+
+        {/* Error banner (upload) */}
+        {uploadError && (
+          <section
+            className="panel"
+            style={{
+              border: '1px solid rgba(236,72,153,.35)',
+              background:
+                'linear-gradient(180deg, rgba(236, 72, 153, 0.12), rgba(236, 72, 153, 0.04))',
+              whiteSpace: 'pre-wrap',
+              fontFamily:
+                'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace',
+            }}
+          >
+            <div style={{ fontWeight: 700, marginBottom: 6 }}>Upload failed</div>
+            <div style={{ fontSize: 12, opacity: 0.9 }}>{uploadError}</div>
+          </section>
+        )}
+
+        {/* Upload area (only visible when not in profile/analyze) */}
+        {phase === 'idle' && (
+          <section className="panel glass holo-border">
+            <FileUploadZone
+              onFileParsed={handleUploadParsed}
+              onError={(msg) => setUploadError(msg)}
+              maxSizeMB={20}
+            />
+          </section>
+        )}
+
+        {/* Profile report */}
+        {phase === 'profile' && profile && (
+          <section className="profile-panel-scroll">
+            <DataHealthReport
+              profile={profile}
+              fileName={fileName || 'dataset.csv'}
+              onProceed={() => {
+                setPhase('analyze');
+                setStatus('idle');
+              }}
+            />
+          </section>
+        )}
+
+        {/* Analyze view */}
+        {phase === 'analyze' && (
+          <section className="analysis-grid">
+            <div className="chat-container">
+              <ChatWindow />
+            </div>
+            <div className="results-panel">
+              <ResultsPanel />
+            </div>
+          </section>
+        )}
+      </main>
+    </div>
   );
-}
+};
+
+export default MainCanvas;

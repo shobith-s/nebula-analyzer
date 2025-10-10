@@ -1,7 +1,11 @@
 import React, { useState } from 'react';
 import { VscRocket, VscGraph, VscListOrdered, VscFilter, VscClose } from 'react-icons/vsc';
 
-export type QuickActionKey = 'summary' | 'correlation' | 'count_by' | 'top_n';
+//export type QuickActionKey = 'summary' | 'correlation' | 'count_by' | 'top_n';
+// add these near the top
+export const QUICK_ACTIONS = ['summary', 'correlation', 'count_by', 'top_n'] as const;
+export type QuickActionKey = typeof QUICK_ACTIONS[number];
+
 
 interface QuickActionsBarProps {
   onRun: (action: QuickActionKey, payload?: Record<string, string>) => void;
