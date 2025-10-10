@@ -3,26 +3,21 @@ import './App.css';
 import Header from './components/Header';
 import Sidebar from './components/Sidebar';
 import MainCanvas from './components/MainCanvas';
-import BackgroundFX from './components/BackgroundFX';
 import { type AIStatus } from './types';
 
 function App() {
   const [aiStatus, setAiStatus] = useState<AIStatus>('idle');
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   return (
-    <div className={`app-container ${sidebarOpen ? 'sidebar-open' : 'sidebar-collapsed'}`}>
-      {/* cosmic background layer */}
-      <BackgroundFX />
-
-      {/* app layers */}
-      <Header
-        status={aiStatus}
-        onToggleSidebar={() => setSidebarOpen((s) => !s)}
-        sidebarOpen={sidebarOpen}
-      />
-      <Sidebar collapsed={!sidebarOpen} />
-      <MainCanvas setAiStatus={setAiStatus} />
+    <div className={`app-shell ${sidebarCollapsed ? 'is-collapsed' : ''}`}>
+      <Header status={aiStatus} onToggleSidebar={() => setSidebarCollapsed(s => !s)} />
+      <div className="shell-body">
+        <Sidebar collapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed(s => !s)} />
+        <main className="shell-main" role="main" aria-label="Main content area">
+          <MainCanvas setAiStatus={setAiStatus} />
+        </main>
+      </div>
     </div>
   );
 }

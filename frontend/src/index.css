@@ -1,44 +1,116 @@
-@import url('https://fonts.googleapis.com/css2?family=Geist+Sans:wght@400;500;700&family=JetBrains+Mono&display=swap');
+/* ====== Global base / resets ====== */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
 
+html,
+body,
+#root {
+  height: 100%;
+  width: 100%;
+  max-width: 100vw;
+  /* never exceed viewport width */
+  margin: 0;
+  padding: 0;
+  overflow-x: hidden;
+  /* no horizontal scroll anywhere */
+}
+
+/* ====== Theme tokens ====== */
 :root {
-  --font-sans: 'Geist Sans', sans-serif;
-  --font-mono: 'JetBrains Mono', monospace;
+  --deep-space-black: #0b1016;
+  --panel-bg: #111418;
 
-  --deep-space-black: #0a0a0f;
-  --nebula-purple: #6366f1;
-  --cosmic-blue: #3b82f6;
-  --stellar-white: #f8fafc;
-
-  --aurora-green: #10b981;
-  --solar-orange: #f59e0b;
+  --stellar-white: #e8eef7;
+  --nebula-purple: #9da5ff;
+  --cosmic-blue: #60a5fa;
+  --aurora-green: #22d3a8;
   --plasma-pink: #ec4899;
-  --quantum-teal: #06b6d4;
+  --solar-orange: #f59e0b;
+  --quantum-teal: #00f0d7;
 
-  font-family: var(--font-sans);
-  line-height: 1.5;
-  font-weight: 400;
-
-  color: var(--stellar-white);
-  background-color: var(--deep-space-black);
-
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
+    monospace;
+  --sans: Inter, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial,
+    "Apple Color Emoji", "Segoe UI Emoji";
 }
 
 body {
-  margin: 0;
-  display: flex;
-  place-items: center;
-  min-width: 320px;
-  min-height: 100vh;
+  font-family: var(--sans);
+  color: var(--stellar-white);
+  line-height: 1.5;
+
+  /* Cosmic background, subtle and performant */
+  background:
+    radial-gradient(42% 48% at 72% 36%, rgba(125, 136, 255, 0.10) 0%, rgba(125, 136, 255, 0) 60%),
+    radial-gradient(38% 45% at 18% 82%, rgba(0, 255, 214, 0.08) 0%, rgba(0, 255, 214, 0) 60%),
+    var(--deep-space-black);
 }
 
-#root {
-  width: 100%;
-  height: 100vh;
-  margin: 0;
-  padding: 0;
-  max-width: none;
+/* Smooth scrolling & subtle scrollbars */
+html {
+  scroll-behavior: smooth;
+}
+
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+*::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+*::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.18);
+  border-radius: 8px;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.28);
+}
+
+/* Code-ish elements */
+code,
+pre {
+  font-family: var(--mono);
+}
+
+/* Links */
+a {
+  color: var(--nebula-purple);
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+/* Utility */
+.hidden {
+  display: none !important;
+}
+
+.nowrap {
+  white-space: nowrap;
+}
+
+.mono {
+  font-family: var(--mono);
+}
+
+.center {
+  display: grid;
+  place-items: center;
+}
+
+/* Prevent any rogue component from forcing viewport width */
+img,
+svg,
+canvas,
+video {
+  max-width: 100%;
+  height: auto;
 }

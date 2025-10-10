@@ -1,15 +1,25 @@
-import { useMemo, useState } from 'react';
-import axios from 'axios';
-import { motion } from 'framer-motion';
+import { useMemo, useState } from "react";
+import axios from "axios";
+import { motion } from "framer-motion";
+import DataTable from "./DataTable";
+import DataChart from "./DataChart";
+import FeatureImportanceChart from "./FeatureImportanceChart";
+import ChatInput from "./ChatInput";
+import ChatWindow from "./ChatWindow";
+import FileUploadZone from "./FileUploadZone";
+import DataHealthReport from "./DataHealthReport";
+import { type AIStatus, type ImportanceData } from "../types";
 
-import FileUploadZone from './FileUploadZone';
-import DataHealthReport, { type CleaningChoices } from './DataHealthReport';
+type View = "upload" | "profile" | "analysis";
 
-import ChatWindow from './ChatWindow';
-import ChatInput from './ChatInput';
-import FeatureImportanceChart from './FeatureImportanceChart';
+interface MainCanvasProps {
+  setAiStatus: (status: AIStatus) => void;
+}
 
-import { type AIStatus, type ImportanceData, type Message } from '../types';
+interface Message {
+  sender: "user" | "ai";
+  text: string;
+}
 
 interface ColumnProfile {
   column_name: string;
@@ -23,69 +33,72 @@ interface HealthReport {
   column_profiles: ColumnProfile[];
 }
 
-interface MainCanvasProps {
-  setAiStatus: (status: AIStatus) => void;
-}
+export type CleaningChoices = {
+  removeDuplicates: boolean;
+  fillMissing: boolean;
+};
 
-function MainCanvas({ setAiStatus }: MainCanvasProps) {
-  const [view, setView] = useState<'upload' | 'profile' | 'analysis'>('upload');
+export default function MainCanvas({ setAiStatus }: MainCanvasProps) {
+  const [view, setView] = useState<View>("upload");
 
+  // data state
   const [rawData, setRawData] = useState<string[][] | null>(null);
   const [headers, setHeaders] = useState<string[]>([]);
-  const [fileName, setFileName] = useState<string>('');
+  const [fileName, setFileName] = useState<string>("");
 
+  // profiling
   const [healthReport, setHealthReport] = useState<HealthReport | null>(null);
   const [cleaningChoices, setCleaningChoices] = useState<CleaningChoices | null>(null);
 
+  // analysis state
   const [featureImportances, setFeatureImportances] = useState<ImportanceData[] | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [modelChoice, setModelChoice] = useState<'gemini' | 'local'>('gemini');
+  const [modelChoice, setModelChoice] = useState<"gemini" | "local">("gemini");
+  const [anomalies, setAnomalies] = useState<number[]>([]);
+  const [xAxis, setXAxis] = useState<string>("");
+  const [yAxis, setYAxis] = useState<string>("");
 
-  const [anomalies, setAnomalies] = useState<number[]>([]); // kept for compatibility
-
-  // ---------- Upload -> Profile ----------
+  // ---------- Upload flow ----------
   const handleFileParsed = async (data: string[][], hdrs: string[], fname: string) => {
     setRawData(data);
     setHeaders(hdrs);
     setFileName(fname);
-    setView('profile');
+    setView("profile");
 
     try {
-      const response = await axios.post('http://127.0.0.1:8000/profile-data', {
+      const response = await axios.post("http://127.0.0.1:8000/profile-data", {
         tabular_data: [hdrs, ...data],
       });
       setHealthReport(response.data);
     } catch (err) {
-      console.error('Failed to profile data:', err);
-      alert('Could not generate a data health report.');
-      setView('upload');
+      console.error("profile-data failed:", err);
+      alert("Could not generate a data health report.");
+      setView("upload");
     }
   };
 
-  // ---------- Profile -> Analysis ----------
+  // ---------- Profile → Analysis ----------
   const proceedToAnalysis = (choices: CleaningChoices) => {
     setCleaningChoices(choices);
-    setView('analysis');
     setMessages([
       {
-        sender: 'ai',
-        text: `Successfully loaded and profiled ${fileName}. Cleaning plan approved. What would you like to know?`,
+        sender: "ai",
+        text: `Successfully loaded and profiled ${fileName}. Cleaning plan approved. Ask a question to generate insights...`,
       },
     ]);
+    setView("analysis");
   };
 
-  // ---------- Chat / Insight ----------
+  // ---------- Chat submit ----------
   const handleSendMessage = async (query: string) => {
     if (!rawData || !headers) return;
-
-    setMessages((prev) => [...prev, { sender: 'user', text: query }]);
+    setMessages((m) => [...m, { sender: "user", text: query }]);
     setIsLoading(true);
-    setAiStatus('thinking');
+    setAiStatus("thinking");
     setFeatureImportances(null);
     setAnomalies([]);
 
-    // Using /analyze keeps things dataset-id free and compatible with your current backend.
     const requestData = {
       tabular_data: [headers, ...rawData],
       query,
@@ -94,26 +107,24 @@ function MainCanvas({ setAiStatus }: MainCanvasProps) {
     };
 
     try {
-      const apiUrl = 'http://127.0.0.1:8000/analyze';
-      const { data } = await axios.post(apiUrl, requestData);
-
-      setMessages((prev) => [...prev, { sender: 'ai', text: data.insight }]);
+      const { data } = await axios.post("http://127.0.0.1:8000/analyze", requestData);
+      setMessages((m) => [...m, { sender: "ai", text: data.insight }]);
       setFeatureImportances(data.feature_importances);
-      setAnomalies(data.anomalies || []);
-      setAiStatus('success');
-    } catch (error) {
+      setAnomalies(data.anomalies);
+      setAiStatus("success");
+    } catch (err: any) {
       const msg =
-        axios.isAxiosError(error) && error.response
-          ? `Error from server: ${error.response.data.detail}`
-          : 'Sorry, an error occurred while talking to the brain.';
-      setMessages((prev) => [...prev, { sender: 'ai', text: msg }]);
-      setAiStatus('error');
+        axios.isAxiosError(err) && err.response
+          ? `Error from server: ${err.response.data.detail}`
+          : "Sorry, an error occurred while talking to the brain.";
+      setMessages((m) => [...m, { sender: "ai", text: msg }]);
+      setAiStatus("error");
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Numeric data for any local charts/tables you keep
+  // ---------- Derived ----------
   const numericDataForViz = useMemo(() => {
     if (!rawData) return [];
     return rawData
@@ -121,47 +132,59 @@ function MainCanvas({ setAiStatus }: MainCanvasProps) {
       .filter((row) => row.every((v) => !Number.isNaN(v)));
   }, [rawData]);
 
-  const cardVariants = {
-    hidden: { opacity: 0, y: 18 },
-    visible: { opacity: 1, y: 0, transition: { duration: 0.45 } },
+  // ---------- UI ----------
+  const panelVariants = {
+    hidden: { opacity: 0, y: 8 },
+    visible: { opacity: 1, y: 0, transition: { duration: 0.35 } },
   };
 
   return (
     <main className="main-canvas">
-      {/* UPLOAD — vertically centered, constrained width */}
-      {view === 'upload' && (
-        <div className="upload-shell">
+      {/* UPLOAD VIEW */}
+      {view === "upload" && (
+        <motion.section
+          className="panel glass holo-border upload-shell"
+          variants={panelVariants}
+          initial="hidden"
+          animate="visible"
+        >
+          <div className="upload-card">
+            <FileUploadZone onFileParsed={handleFileParsed} />
+          </div>
+        </motion.section>
+      )}
+
+      {/* PROFILE VIEW (scrolls safely inside itself) */}
+      {view === "profile" && (
+        <motion.section
+          className="panel glass holo-border profile-panel-scroll"
+          variants={panelVariants}
+          initial="hidden"
+          animate="visible"
+        >
+          <DataHealthReport report={healthReport} fileName={fileName} onProceed={proceedToAnalysis} />
+        </motion.section>
+      )}
+
+      {/* ANALYSIS VIEW */}
+      {view === "analysis" && (
+        <section className="analysis-grid">
+          {/* LEFT: Console column */}
           <motion.div
-            className="card glass holo-border upload-card"
-            variants={cardVariants}
+            className="panel glass holo-border console-col"
+            variants={panelVariants}
             initial="hidden"
             animate="visible"
           >
-            <FileUploadZone onFileParsed={handleFileParsed} />
-          </motion.div>
-        </div>
-      )}
-
-      {/* PROFILE — scrollable inside panel; sticky bottom Proceed */}
-      {view === 'profile' && (
-        <div className="panel profile-panel-scroll glass holo-border">
-          <DataHealthReport report={healthReport} fileName={fileName} onProceed={proceedToAnalysis} />
-        </div>
-      )}
-
-      {/* ANALYSIS — left: chat/console, right: results (your charts/tables as before) */}
-      {view === 'analysis' && (
-        <div className="analysis-grid">
-          {/* LEFT: chat console */}
-          <motion.div className="panel glass holo-border" variants={cardVariants} initial="hidden" animate="visible">
+            {/* model selector */}
             <div className="model-selector">
-              <span>Select AI Engine:</span>
+              <span>AI Engine:</span>
               <label>
                 <input
                   type="radio"
                   value="gemini"
-                  checked={modelChoice === 'gemini'}
-                  onChange={() => setModelChoice('gemini')}
+                  checked={modelChoice === "gemini"}
+                  onChange={() => setModelChoice("gemini")}
                 />
                 Gemini API (Cloud)
               </label>
@@ -169,33 +192,113 @@ function MainCanvas({ setAiStatus }: MainCanvasProps) {
                 <input
                   type="radio"
                   value="local"
-                  checked={modelChoice === 'local'}
-                  onChange={() => setModelChoice('local')}
+                  checked={modelChoice === "local"}
+                  onChange={() => setModelChoice("local")}
                 />
                 GPT-Neo (Local)
               </label>
             </div>
 
-            <div className="chat-container">
+            {/* quick-actions */}
+            <div className="quickbar">
+              <button onClick={() => handleSendMessage("summary")} className="chip">
+                Summary
+              </button>
+              <button onClick={() => handleSendMessage("correlation heatmap")} className="chip">
+                Correlation
+              </button>
+              <button
+                onClick={() => handleSendMessage("top 5 by Salary")}
+                className="chip"
+              >
+                Top 5 by Salary
+              </button>
+              <button
+                onClick={() => handleSendMessage("count by Department")}
+                className="chip"
+              >
+                Count by Dept
+              </button>
+            </div>
+
+            {/* chat feed (independent scroll) */}
+            <div className="chat-window">
               <ChatWindow messages={messages} />
-              <div className="console-input">
-                <ChatInput onSendMessage={handleSendMessage} isLoading={isLoading} disabled={!rawData} />
-              </div>
+            </div>
+
+            {/* input (sticky to bottom of column; no overlap) */}
+            <div className="console-input">
+              <ChatInput
+                onSendMessage={handleSendMessage}
+                isLoading={isLoading}
+                disabled={!rawData}
+              />
             </div>
           </motion.div>
 
-          {/* RIGHT: results */}
-          <motion.div className="panel glass holo-border results-panel" variants={cardVariants} initial="hidden" animate="visible">
-            {featureImportances ? (
-              <FeatureImportanceChart data={featureImportances} />
-            ) : (
-              <div className="results-placeholder">Ask a question to generate insights…</div>
+          {/* RIGHT: Results column */}
+          <motion.div
+            className="panel glass holo-border results-panel"
+            variants={panelVariants}
+            initial="hidden"
+            animate="visible"
+          >
+            {/* feature importance */}
+            {featureImportances && featureImportances.length > 0 && (
+              <div className="block">
+                <h3 className="panel-title">Top Associations</h3>
+                <FeatureImportanceChart data={featureImportances} />
+              </div>
             )}
+
+            {/* simple numeric viz area */}
+            {rawData && (
+              <div className="block">
+                <div className="chart-controls">
+                  <div className="select-wrapper">
+                    <label>X:</label>
+                    <select value={xAxis} onChange={(e) => setXAxis(e.target.value)}>
+                      <option value="">(choose)</option>
+                      {headers.map((h) => (
+                        <option key={h} value={h}>
+                          {h}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="select-wrapper">
+                    <label>Y:</label>
+                    <select value={yAxis} onChange={(e) => setYAxis(e.target.value)}>
+                      <option value="">(choose)</option>
+                      {headers.map((h) => (
+                        <option key={h} value={h}>
+                          {h}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+                <DataChart data={numericDataForViz} />
+              </div>
+            )}
+
+            {/* table + anomalies */}
+            {numericDataForViz.length > 0 && (
+              <div className="block">
+                <h3 className="panel-title">Preview</h3>
+                <DataTable data={numericDataForViz} headers={headers} anomalies={anomalies} />
+              </div>
+            )}
+
+            {(!featureImportances || featureImportances.length === 0) &&
+              numericDataForViz.length === 0 && (
+                <div className="results-placeholder">
+                  <p>Ask a question to generate insights…</p>
+                </div>
+              )}
           </motion.div>
-        </div>
+        </section>
       )}
     </main>
   );
 }
-
-export default MainCanvas;
