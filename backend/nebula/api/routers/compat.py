@@ -1,68 +1,66 @@
-from typing import List, Any, Dict
-import pandas as pd
-import numpy as np
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Request, UploadFile, File, Form, HTTPException
 from pydantic import BaseModel
-
-from nebula.core.state import brain  # shared NEBULA brain
+from typing import List, Optional
 
 router = APIRouter()
 
-# ----- payload models (minimal, only what the FE expects) -----
-class CleaningChoices(BaseModel):
-    removeDuplicates: bool
-    fillMissing: bool
+class TabularData(BaseModel):
+    headers: List[str]
+    rows: List[List[str]]
 
-class ProfileRequest(BaseModel):
-    tabular_data: List[List[Any]]
-
-class MemoryResponse(BaseModel):
-    history: List[Dict[str, str]]
+class ProfileIn(BaseModel):
+    filename: str
+    tabular_data: TabularData
 
 @router.post("/profile-data")
-def profile_data(request: ProfileRequest):
-    if not request.tabular_data or len(request.tabular_data) < 2:
-        raise HTTPException(status_code=400, detail="Incomplete data.")
-    headers, data_rows = request.tabular_data[0], request.tabular_data[1:]
-    df = pd.DataFrame(data_rows, columns=headers)
+async def profile_data(
+    request: Request,
+    filename: Optional[str] = Form(None),
+    file: Optional[UploadFile] = File(None),
+):
+    """
+    Compatibility endpoint for the current frontend:
+      1) JSON mode (preferred):
+         {
+           "filename": "file.csv",
+           "tabular_data": { "headers": [...], "rows": [[...],[...], ...] }
+         }
+      2) Fallback: multipart/form-data with a file field.
+    """
+    # Try JSON body first
+    try:
+      data = await request.json()
+      body = ProfileIn(**data)  # raises ValidationError if wrong shape
 
-    report = {
-        "general_stats": {
-            "total_rows": len(df),
-            "duplicate_rows": int(df.duplicated().sum()),
-        },
-        "column_profiles": [],
-    }
+      if not body.tabular_data.headers:
+          raise HTTPException(status_code=422, detail="No headers found in tabular_data.")
+      if not all(isinstance(r, list) for r in body.tabular_data.rows):
+          raise HTTPException(status_code=422, detail="rows must be a list of lists of strings.")
 
-    for col in df.columns:
-        col_profile = {"column_name": col}
-        numeric_col = pd.to_numeric(df[col], errors="coerce")
+      print("[BE] /profile-data JSON ok:",
+            {"filename": body.filename,
+             "n_cols": len(body.tabular_data.headers),
+             "n_rows": len(body.tabular_data.rows)})
 
-        is_num = (
-            pd.api.types.is_numeric_dtype(numeric_col)
-            and numeric_col.notna().sum() > len(df) / 2
-        )
-        col_profile["data_type"] = "numerical" if is_num else "categorical"
+      # TODO: invoke real profiler here and return its summary
+      return {
+          "ok": True,
+          "mode": "json",
+          "filename": body.filename,
+          "n_cols": len(body.tabular_data.headers),
+          "n_rows": len(body.tabular_data.rows),
+      }
+    except Exception:
+      # Fall through to multipart if JSON wasn't provided or invalid
+      pass
 
-        missing_count = int(df[col].isnull().sum() | numeric_col.isnull().sum())
-        col_profile["missing_values"] = missing_count
-        col_profile["missing_percentage"] = (
-            (missing_count / len(df)) * 100 if len(df) > 0 else 0
-        )
+    # Fallback: multipart CSV
+    if file is not None:
+        content = await file.read()
+        print("[BE] /profile-data CSV received:",
+              {"filename": filename or file.filename, "bytes": len(content)})
 
-        outlier_count = 0
-        if is_num:
-            q1, q3 = numeric_col.quantile(0.25), numeric_col.quantile(0.75)
-            iqr = q3 - q1
-            lower, upper = q1 - 1.5 * iqr, q3 + 1.5 * iqr
-            outlier_count = int(((numeric_col < lower) | (numeric_col > upper)).sum())
-        col_profile["outlier_count"] = outlier_count
+        # TODO: parse CSV -> profile
+        return {"ok": True, "mode": "csv", "filename": filename or file.filename}
 
-        report["column_profiles"].append(col_profile)
-
-    return report
-
-@router.get("/memory", response_model=MemoryResponse)
-def get_memory():
-    history = [{"query": q, "insight": i} for q, i in brain.memory]
-    return {"history": history}
+    raise HTTPException(status_code=422, detail="Provide JSON body (filename+tabular_data) or CSV file.")

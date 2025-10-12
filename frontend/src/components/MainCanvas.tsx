@@ -1,185 +1,215 @@
-import React, { useMemo, useState } from 'react';
-import FileUploadZone from './FileUploadZone';
-import DataHealthReport from './DataHealthReport';
-import ResultsPanel from './ResultsPanel';
-import ChatWindow from './ChatWindow';
-import Header from './Header';
-import { type AIStatus } from '../types';
+import React, { useCallback, useMemo, useRef, useState } from "react";
+import Papa from "papaparse";
+import DataHealthReport, { ProfileSummary } from "./DataHealthReport";
+import ResultsPanel from "./ResultsPanel";
 
-type Phase = 'idle' | 'profile' | 'analyze';
+const API_BASE = "/api";
+
+type ViewMode = "welcome" | "profile" | "analyze";
 
 const MainCanvas: React.FC = () => {
-  const [status, setStatus] = useState<AIStatus>('idle');
-  const [phase, setPhase] = useState<Phase>('idle');
+  const [view, setView] = useState<ViewMode>("welcome");
+  const [busy, setBusy] = useState(false);
+  const [status, setStatus] = useState<"idle" | "uploaded" | "error">("idle");
+  const [error, setError] = useState<string | null>(null);
 
-  const [uploadError, setUploadError] = useState<string | null>(null);
-  const [fileName, setFileName] = useState<string | null>(null);
+  const [profile, setProfile] = useState<ProfileSummary | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  // Data returned by /profile-data
-  const [profile, setProfile] = useState<any | null>(null);
-
-  const resetErrors = () => setUploadError(null);
-
-  const handleUploadParsed = async (
-    rows: string[][],
-    headers: string[],
-    filename: string
-  ) => {
-    resetErrors();
-    setStatus('thinking');
-    setFileName(filename);
-
-    try {
-      // IMPORTANT: match backend schema
-      const payload = {
-        filename,
-        tabular_data: {
-          headers,
-          rows,
-        },
-      };
-
-      const res = await fetch('/profile-data', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-
-      if (!res.ok) {
-        // try to read json; fall back to text
-        let message = `Server returned ${res.status}`;
-        try {
-          const j = await res.json();
-          message = typeof j === 'string' ? j : JSON.stringify(j, null, 2);
-        } catch {
-          try {
-            message = await res.text();
-          } catch {
-            /* no-op */
-          }
-        }
-        throw new Error(message);
+  const postJsonProfile = useCallback(async (file: File): Promise<ProfileSummary> => {
+    const { headers, rows } = await new Promise<{ headers: string[]; rows: string[][] }>(
+      (resolve, reject) => {
+        Papa.parse(file, {
+          header: true,
+          skipEmptyLines: true,
+          dynamicTyping: false,
+          complete: (result) => {
+            try {
+              const rowsObj = result.data as Record<string, unknown>[];
+              const hdrs =
+                rowsObj.length > 0 ? Object.keys(rowsObj[0] ?? {}) : (result.meta.fields ?? []);
+              const matrix = rowsObj.map((r) => hdrs.map((h) => String(r[h] ?? "")));
+              resolve({ headers: hdrs, rows: matrix });
+            } catch (e) {
+              reject(e);
+            }
+          },
+          error: (err) => reject(err),
+        });
       }
+    );
 
-      const data = await res.json();
-      setProfile(data);
-      setPhase('profile');
-      setStatus('success');
-    } catch (err: any) {
-      setUploadError(
-        `Upload failed\n${typeof err?.message === 'string' ? err.message : String(err)}`
-      );
-      setStatus('error');
+    const res = await fetch(`${API_BASE}/profile-data`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        filename: file.name,
+        tabular_data: { headers, rows },
+      }),
+    });
+
+    if (!res.ok) {
+      let msg = `HTTP ${res.status}`;
+      try {
+        const text = await res.text();
+        if (text) msg = `${msg}: ${text}`;
+      } catch {}
+      throw new Error(msg);
     }
+
+    const data = (await res.json()) as ProfileSummary;
+    return data;
+  }, []);
+
+  const handleFile = useCallback(
+    async (file: File) => {
+      setError(null);
+      setBusy(true);
+      setStatus("idle");
+      try {
+        const summary = await postJsonProfile(file);
+        setProfile(summary);
+        setStatus("uploaded");
+        setView("profile");
+      } catch (e: any) {
+        setError(e?.message || "Upload failed");
+        setStatus("error");
+      } finally {
+        setBusy(false);
+        if (fileInputRef.current) fileInputRef.current.value = "";
+      }
+    },
+    [postJsonProfile]
+  );
+
+  const onBrowseClick = () => fileInputRef.current?.click();
+
+  const onFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0];
+    if (f) handleFile(f);
   };
 
-  const headerStatus = useMemo<AIStatus>(() => status, [status]);
+  const onDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    const f = e.dataTransfer.files?.[0];
+    if (f) handleFile(f);
+  };
+  const onDragOver = (e: React.DragEvent<HTMLDivElement>) => e.preventDefault();
+
+  const headerBadge = useMemo(() => {
+    if (busy) return "Processing…";
+    if (status === "uploaded") return "Ready for Analysis";
+    if (status === "error") return "Error";
+    return "Ready for Analysis";
+  }, [busy, status]);
 
   return (
-    <div className="app-container">
-      <Header status={headerStatus} />
+    <main className="main-canvas">
+      <div className="toolbar glass holo-border">
+        <div className="brand-left">
+          <span className="brand">
+            Welcome to NEBULA <span className="pill">v0.1</span>
+          </span>
+        </div>
+        <div className={`status-badge ${busy ? "thinking" : status === "error" ? "error" : "ok"}`}>
+          {headerBadge}
+        </div>
+      </div>
 
-      {/* Left rail (toggle button lives in Header in your codebase; the rail itself is Sidebar.tsx) */}
-      {/* Sidebar is already rendered outside or via parent layout. */}
-
-      <main className="main-canvas">
-        {/* Welcome / quick-hints capsule */}
-        <section className="panel glass holo-border" style={{ padding: 16 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <strong>Welcome to NEBULA</strong>
-            <span
-              style={{
-                fontSize: 10,
-                padding: '2px 6px',
-                borderRadius: 999,
-                background: 'rgba(129,140,248,.12)',
-                border: '1px solid rgba(129,140,248,.25)',
-              }}
-            >
-              v0.1
-            </span>
-          </div>
-
-          <div style={{ marginTop: 8, fontSize: 12, opacity: 0.85 }}>
-            Drop a CSV to get a quality report and ask questions like:
-          </div>
-
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 10 }}>
-            {['summary', 'correlation', 'top 5 by Salary', 'mean of Age', 'count by Department where Score ≥ 4.5'].map(
-              (q) => (
-                <span
-                  key={q}
-                  style={{
-                    fontSize: 11,
-                    padding: '4px 8px',
-                    borderRadius: 999,
-                    background: 'rgba(255,255,255,.04)',
-                    border: '1px solid rgba(255,255,255,.08)',
-                  }}
-                >
-                  {q}
+      {view === "welcome" && (
+        <section className="welcome card glass holo-border">
+          <div className="welcome-head">
+            <h2>Drop a CSV to get a quality report and ask questions like:</h2>
+            <div className="chips">
+              {[
+                "summary",
+                "correlation",
+                "top 5 by Salary",
+                "mean of Age",
+                "count by Department where Score ≥ 4.5",
+              ].map((t) => (
+                <span key={t} className="chip">
+                  {t}
                 </span>
-              )
-            )}
+              ))}
+            </div>
+          </div>
+
+          <div
+            className={`dropzone ${busy ? "disabled" : ""}`}
+            onDrop={onDrop}
+            onDragOver={onDragOver}
+            onClick={onBrowseClick}
+            role="button"
+            tabIndex={0}
+          >
+            <div className="dz-inner">
+              <div className="dz-title">Drag & drop your CSV</div>
+              <div className="dz-sub">or click anywhere in this box</div>
+              <div className="dz-meta">(max 20 MB)</div>
+            </div>
+          </div>
+
+          {/* Hidden native input (no inline styles) */}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".csv,text/csv"
+            onChange={onFileInputChange}
+            className="visually-hidden"
+          />
+
+          {error && <div className="alert error">{error}</div>}
+        </section>
+      )}
+
+      {view === "profile" && (
+        <section className="profile-panel card glass holo-border profile-panel-scroll">
+          {profile ? (
+            <DataHealthReport summary={profile} onProceed={() => setView("analyze")} />
+          ) : (
+            <div className="results-placeholder">No profile to show.</div>
+          )}
+        </section>
+      )}
+
+      {view === "analyze" && (
+        <section className="analysis-grid">
+          <div className="panel glass holo-border chat-column">
+            <div className="model-selector">
+              <label>
+                <input type="radio" name="model" defaultChecked /> Gemini API (Cloud)
+              </label>
+              <label>
+                <input type="radio" name="model" /> GPT-Neo (Local)
+              </label>
+            </div>
+
+            <div className="chat-container">
+              <div className="chat-window">
+                <div className="chat-message ai">
+                  <div className="message-bubble">Ask a question to generate insights…</div>
+                </div>
+              </div>
+
+              <div className="chat-input-container">
+                <textarea
+                  placeholder='Ask a question about your file (e.g., “correlation heatmap”, “mean of price”, “top 5 by salary”).'
+                  aria-label="Ask a question"
+                />
+                <button className="btn-primary" disabled={busy}>
+                  Send
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div className="panel glass holo-border results-column">
+            <ResultsPanel />
           </div>
         </section>
-
-        {/* Error banner (upload) */}
-        {uploadError && (
-          <section
-            className="panel"
-            style={{
-              border: '1px solid rgba(236,72,153,.35)',
-              background:
-                'linear-gradient(180deg, rgba(236, 72, 153, 0.12), rgba(236, 72, 153, 0.04))',
-              whiteSpace: 'pre-wrap',
-              fontFamily:
-                'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace',
-            }}
-          >
-            <div style={{ fontWeight: 700, marginBottom: 6 }}>Upload failed</div>
-            <div style={{ fontSize: 12, opacity: 0.9 }}>{uploadError}</div>
-          </section>
-        )}
-
-        {/* Upload area (only visible when not in profile/analyze) */}
-        {phase === 'idle' && (
-          <section className="panel glass holo-border">
-            <FileUploadZone
-              onFileParsed={handleUploadParsed}
-              onError={(msg) => setUploadError(msg)}
-              maxSizeMB={20}
-            />
-          </section>
-        )}
-
-        {/* Profile report */}
-        {phase === 'profile' && profile && (
-          <section className="profile-panel-scroll">
-            <DataHealthReport
-              profile={profile}
-              fileName={fileName || 'dataset.csv'}
-              onProceed={() => {
-                setPhase('analyze');
-                setStatus('idle');
-              }}
-            />
-          </section>
-        )}
-
-        {/* Analyze view */}
-        {phase === 'analyze' && (
-          <section className="analysis-grid">
-            <div className="chat-container">
-              <ChatWindow />
-            </div>
-            <div className="results-panel">
-              <ResultsPanel />
-            </div>
-          </section>
-        )}
-      </main>
-    </div>
+      )}
+    </main>
   );
 };
 

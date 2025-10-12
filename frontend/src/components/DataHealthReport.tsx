@@ -1,152 +1,128 @@
-import React, { useMemo, useState } from 'react';
+import React from "react";
 
-export interface CleaningChoices {
-  removeDuplicates: boolean;
-  fillMissing: boolean;
-}
+/** Shape returned by /api/profile-data */
+export type ProfileSummary = {
+  filename: string;
+  n_rows: number;
+  n_cols: number;
 
-interface ColumnProfile {
-  column_name: string;
-  data_type: string;
-  missing_values: number;
-  missing_percentage: number;
-  outlier_count: number;
-}
-interface HealthReport {
-  general_stats: { total_rows: number; duplicate_rows: number };
-  column_profiles: ColumnProfile[];
-}
+  /** Optional, if backend provides extra stats */
+  missing_values?: number;
+  duplicate_rows?: number;
+  quality_score?: number | null;
+
+  /** Optional, if backend provides per-column info */
+  columns?: Array<{
+    name: string;
+    dtype?: string;
+    missing?: number;     // count
+    outliers?: number;    // count
+  }>;
+};
 
 interface Props {
-  report: HealthReport | null;
-  fileName: string;
-  onProceed: (choices: CleaningChoices) => void;
+  summary: ProfileSummary;
+  onProceed: () => void;
 }
 
-const DataHealthReport: React.FC<Props> = ({ report, fileName, onProceed }) => {
-  const [choices, setChoices] = useState<CleaningChoices>({
-    removeDuplicates: true,
-    fillMissing: true,
-  });
-
-  const metrics = useMemo(() => {
-    const rows = report?.general_stats.total_rows ?? 0;
-    const dups = report?.general_stats.duplicate_rows ?? 0;
-    const cols = report?.column_profiles?.length ?? 0;
-    const missing =
-      report?.column_profiles?.reduce((s, c) => s + (c.missing_values || 0), 0) ?? 0;
-
-    const cells = Math.max(rows * cols, 1);
-    const missPct = cells ? (missing / cells) * 100 : 0;
-    const dupPct = rows ? (dups / rows) * 100 : 0;
-
-    let score = 100 - (missPct * 0.8 + dupPct * 0.2);
-    if (!isFinite(score)) score = 0;
-    score = Math.max(0, Math.min(100, score));
-
-    return { rows, cols, dups, missing, missPct, dupPct, score };
-  }, [report]);
-
-  if (!report) return <div>No profile available.</div>;
+const DataHealthReport: React.FC<Props> = ({ summary, onProceed }) => {
+  const quality = summary.quality_score ?? null;
 
   return (
-    <section className="data-health-report">
-      <h2>
-        Data Health Report for <span className="file-name">{fileName || 'your file'}</span>
-      </h2>
+    <div className="data-health-report">
+      <div className="dhr-header">
+        <h2>
+          Data Health Report for <span className="file-name">{summary.filename}</span>
+        </h2>
+      </div>
 
-      {/* Two-column layout (safe widths) */}
       <div className="profile-grid">
-        {/* LEFT: Column analysis table */}
-        <div className="profile-left">
-          <h3>Column Analysis</h3>
+        {/* Left: column analysis (table) */}
+        <div className="profile-left card">
           <div className="table-container">
             <table>
               <thead>
                 <tr>
-                  <th style={{ textAlign: 'left' }}>Column Name</th>
-                  <th style={{ textAlign: 'left' }}>Data Type</th>
-                  <th>Missing Values</th>
-                  <th>Outliers Detected</th>
+                  <th>Column Name</th>
+                  <th>Data Type</th>
+                  <th>Missing</th>
+                  <th>Outliers</th>
                 </tr>
               </thead>
               <tbody>
-                {report.column_profiles.map((c) => (
-                  <tr key={c.column_name}>
-                    <td style={{ textAlign: 'left' }}>{c.column_name}</td>
-                    <td style={{ textAlign: 'left' }}>{c.data_type}</td>
-                    <td>
-                      {c.missing_values} ({c.missing_percentage.toFixed(1)}%)
-                    </td>
-                    <td>{c.outlier_count}</td>
+                {(summary.columns ?? []).map((c) => (
+                  <tr key={c.name}>
+                    <td>{c.name}</td>
+                    <td>{c.dtype ?? "—"}</td>
+                    <td>{c.missing ?? 0}</td>
+                    <td>{c.outliers ?? 0}</td>
                   </tr>
                 ))}
+                {(!summary.columns || summary.columns.length === 0) && (
+                  <tr>
+                    <td colSpan={4} style={{ textAlign: "center", opacity: 0.8 }}>
+                      No per-column details were provided by the server.
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>
         </div>
 
-        {/* RIGHT: compact stats + cleaning plan */}
-        <div className="profile-right">
-          <div className="stats-card">
-            <h3>Dataset Stats</h3>
-            <div className="stats-table-wrap">
-              <table className="stats-table">
-                <tbody>
-                  <tr><td>Data Quality Score</td><td className="num strong">{metrics.score.toFixed(1)}%</td></tr>
-                  <tr><td>Total Rows</td><td className="num">{metrics.rows.toLocaleString()}</td></tr>
-                  <tr><td>Total Columns</td><td className="num">{metrics.cols}</td></tr>
-                  <tr><td>Missing Values</td><td className="num">{metrics.missing.toLocaleString()} ({metrics.missPct.toFixed(1)}%)</td></tr>
-                  <tr><td>Duplicate Rows</td><td className="num">{metrics.dups.toLocaleString()} ({metrics.dupPct.toFixed(1)}%)</td></tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
+        {/* Right: dataset stats */}
+        <aside className="profile-right stats-card">
+          <h3>Dataset Stats</h3>
+          <table className="stats-table">
+            <tbody>
+              <tr>
+                <td>Data Quality Score</td>
+                <td className="num strong">
+                  {quality === null ? "—" : `${Number(quality).toFixed(1)}%`}
+                </td>
+              </tr>
+              <tr>
+                <td>Total Rows</td>
+                <td className="num">{summary.n_rows.toLocaleString()}</td>
+              </tr>
+              <tr>
+                <td>Total Columns</td>
+                <td className="num">{summary.n_cols.toLocaleString()}</td>
+              </tr>
+              {"missing_values" in summary && (
+                <tr>
+                  <td>Missing Values</td>
+                  <td className="num">{Number(summary.missing_values ?? 0).toLocaleString()}</td>
+                </tr>
+              )}
+              {"duplicate_rows" in summary && (
+                <tr>
+                  <td>Duplicate Rows</td>
+                  <td className="num">{Number(summary.duplicate_rows ?? 0).toLocaleString()}</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
 
           <div className="cleaning-plan">
-            <h3>Suggested Cleaning Plan</h3>
+            <h4>Suggested Cleaning Plan</h4>
             <ul>
-              <li>
-                <label>
-                  <input
-                    type="checkbox"
-                    checked={choices.removeDuplicates}
-                    onChange={(e) =>
-                      setChoices((s) => ({ ...s, removeDuplicates: e.target.checked }))
-                    }
-                  />
-                  {' '}Remove {metrics.dups} duplicate row{metrics.dups === 1 ? '' : 's'}.
-                </label>
-              </li>
-              <li>
-                <label>
-                  <input
-                    type="checkbox"
-                    checked={choices.fillMissing}
-                    onChange={(e) =>
-                      setChoices((s) => ({ ...s, fillMissing: e.target.checked }))
-                    }
-                  />
-                  {' '}Fill {metrics.missing} missing value{metrics.missing === 1 ? '' : 's'} (median for numeric).
-                </label>
-              </li>
+              <li>Handle missing values appropriately (impute or drop).</li>
+              <li>Remove duplicate rows if not intentional.</li>
+              <li>Cast columns to correct data types.</li>
+              <li>Check outliers for validity.</li>
             </ul>
           </div>
-        </div>
+        </aside>
       </div>
 
-      {/* Sticky bottom footer (inside scroll area) */}
       <div className="profile-footer">
-        <div className="profile-footer-left">
-          <span className="hint">Ready when you are.</span>
-        </div>
-        <div className="profile-footer-right">
-          <button className="analyze-button" onClick={() => onProceed(choices)}>
-            Proceed to Analysis
-          </button>
-        </div>
+        <div className="hint">Looks good? Continue to the analysis workspace.</div>
+        <button className="analyze-button" onClick={onProceed}>
+          Proceed to Analysis
+        </button>
       </div>
-    </section>
+    </div>
   );
 };
 
