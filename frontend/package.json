@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "axios": "^1.6.8",
+    "classnames": "^2.5.1",
     "framer-motion": "^11.0.24",
     "papaparse": "^5.4.1",
     "react": "^18.2.0",
@@ -20,6 +21,7 @@
     "recharts": "^2.12.4"
   },
   "devDependencies": {
+    "@types/classnames": "^2.3.0",
     "@types/papaparse": "^5.3.14",
     "@types/react": "^18.2.66",
     "@types/react-dom": "^18.2.22",
