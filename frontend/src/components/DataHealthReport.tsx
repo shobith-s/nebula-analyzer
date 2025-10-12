@@ -1,116 +1,114 @@
 import React from "react";
-
-/** Shape returned by /api/profile-data */
-export type ProfileSummary = {
-  filename: string;
-  n_rows: number;
-  n_cols: number;
-
-  /** Optional, if backend provides extra stats */
-  missing_values?: number;
-  duplicate_rows?: number;
-  quality_score?: number | null;
-
-  /** Optional, if backend provides per-column info */
-  columns?: Array<{
-    name: string;
-    dtype?: string;
-    missing?: number;     // count
-    outliers?: number;    // count
-  }>;
-};
+import type { ProfileSummary } from "../types";
 
 interface Props {
   summary: ProfileSummary;
   onProceed: () => void;
 }
 
+const fmt = (v: number | null | undefined, digits = 0) =>
+  v === null || v === undefined ? "—" : v.toFixed(digits);
+
 const DataHealthReport: React.FC<Props> = ({ summary, onProceed }) => {
-  const quality = summary.quality_score ?? null;
+  const cols = summary.columns ?? [];
+  const suggestions =
+    summary.suggestions ??
+    [
+      "Handle missing values appropriately (impute or drop).",
+      "Remove duplicate rows if not intentional.",
+      "Cast columns to correct data types.",
+      "Check outliers for validity.",
+    ];
 
   return (
     <div className="data-health-report">
-      <div className="dhr-header">
-        <h2>
-          Data Health Report for <span className="file-name">{summary.filename}</span>
-        </h2>
-      </div>
+      <h2 className="section-title">
+        Data Health Report for <span className="file-name">{summary.filename}</span>
+      </h2>
 
       <div className="profile-grid">
-        {/* Left: column analysis (table) */}
-        <div className="profile-left card">
-          <div className="table-container">
-            <table>
+        {/* left: table */}
+        <div className="profile-left">
+          <div className="table-container card">
+            <table className="nebula-table">
               <thead>
                 <tr>
                   <th>Column Name</th>
                   <th>Data Type</th>
                   <th>Missing</th>
                   <th>Outliers</th>
+                  <th>Duplicates</th>
                 </tr>
               </thead>
               <tbody>
-                {(summary.columns ?? []).map((c) => (
-                  <tr key={c.name}>
-                    <td>{c.name}</td>
-                    <td>{c.dtype ?? "—"}</td>
-                    <td>{c.missing ?? 0}</td>
-                    <td>{c.outliers ?? 0}</td>
-                  </tr>
-                ))}
-                {(!summary.columns || summary.columns.length === 0) && (
+                {cols.length === 0 ? (
                   <tr>
-                    <td colSpan={4} style={{ textAlign: "center", opacity: 0.8 }}>
+                    <td colSpan={5} className="muted">
                       No per-column details were provided by the server.
                     </td>
                   </tr>
+                ) : (
+                  cols.map((c) => (
+                    <tr key={c.name}>
+                      <td>{c.name}</td>
+                      <td>{c.dtype}</td>
+                      <td>
+                        {c.missing} ({fmt(c.missing_pct, 1)}%)
+                      </td>
+                      <td>{c.outliers}</td>
+                      <td>{c.duplicates ?? "—"}</td>
+                    </tr>
+                  ))
                 )}
               </tbody>
             </table>
           </div>
         </div>
 
-        {/* Right: dataset stats */}
-        <aside className="profile-right stats-card">
-          <h3>Dataset Stats</h3>
-          <table className="stats-table">
-            <tbody>
-              <tr>
-                <td>Data Quality Score</td>
-                <td className="num strong">
-                  {quality === null ? "—" : `${Number(quality).toFixed(1)}%`}
-                </td>
-              </tr>
-              <tr>
-                <td>Total Rows</td>
-                <td className="num">{summary.n_rows.toLocaleString()}</td>
-              </tr>
-              <tr>
-                <td>Total Columns</td>
-                <td className="num">{summary.n_cols.toLocaleString()}</td>
-              </tr>
-              {"missing_values" in summary && (
+        {/* right: stats */}
+        <aside className="profile-right">
+          <div className="stats-card">
+            <h3>Dataset Stats</h3>
+            <table className="stats-table">
+              <tbody>
                 <tr>
-                  <td>Missing Values</td>
-                  <td className="num">{Number(summary.missing_values ?? 0).toLocaleString()}</td>
+                  <td>Data Quality Score</td>
+                  <td className="num strong">
+                    {summary.quality_score === null || summary.quality_score === undefined
+                      ? "—"
+                      : `${fmt(summary.quality_score, 1)}%`}
+                  </td>
                 </tr>
-              )}
-              {"duplicate_rows" in summary && (
                 <tr>
-                  <td>Duplicate Rows</td>
-                  <td className="num">{Number(summary.duplicate_rows ?? 0).toLocaleString()}</td>
+                  <td>Total Rows</td>
+                  <td className="num">{summary.n_rows.toLocaleString()}</td>
                 </tr>
-              )}
-            </tbody>
-          </table>
+                <tr>
+                  <td>Total Columns</td>
+                  <td className="num">{summary.n_cols}</td>
+                </tr>
+                {summary.missing_total !== undefined && (
+                  <tr>
+                    <td>Missing Values</td>
+                    <td className="num">{summary.missing_total.toLocaleString()}</td>
+                  </tr>
+                )}
+                {summary.duplicates_total !== undefined && (
+                  <tr>
+                    <td>Duplicate Rows</td>
+                    <td className="num">{summary.duplicates_total.toLocaleString()}</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
 
           <div className="cleaning-plan">
             <h4>Suggested Cleaning Plan</h4>
             <ul>
-              <li>Handle missing values appropriately (impute or drop).</li>
-              <li>Remove duplicate rows if not intentional.</li>
-              <li>Cast columns to correct data types.</li>
-              <li>Check outliers for validity.</li>
+              {suggestions.map((s, i) => (
+                <li key={i}>{s}</li>
+              ))}
             </ul>
           </div>
         </aside>
