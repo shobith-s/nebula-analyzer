@@ -51,45 +51,6 @@ textarea {
   font: inherit;
 }
 
-<<<<<<< HEAD
-.panel {
-  border-radius: 16px;
-  background: rgba(15, 23, 42, 0.4);
-  border: 1px solid rgba(255, 255, 255, 0.06);
-}
-
-/* Headings + spacing harmony */
-h1,
-.h1,
-h2,
-.h2 {
-  letter-spacing: -0.01em;
-}
-
-/* Dropzone look (if you rely on className="dropzone") */
-.dropzone {
-  border: 1px dashed rgba(255, 255, 255, 0.12);
-  border-radius: 16px;
-  padding: 28px;
-  text-align: center;
-  background: rgba(2, 6, 23, 0.55);
-}
-
-.dropzone.active {
-  background: rgba(2, 6, 23, 0.7);
-}
-
-/* Sidebar text spacing */
-aside[aria-label="Neural Control Panel"] .p-3>.rounded-xl {
-  margin-top: 8px;
-}
-
-/* Panel heading weight */
-.panel h1,
-.panel h2 {
-  letter-spacing: -0.01em;
-}
-=======
 .app-shell {
   display: flex;
   height: 100%;
@@ -600,4 +561,79 @@ main.sidebar-collapsed {
   color: var(--ink-dim);
   font-size: 16px;
 }
->>>>>>> 04ba237fbfa63ae54e937c04af64c0e6029b8d5c
+
+/* LEFT analysis pane (matches right panel’s style) */
+.left-pane {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: rgba(15, 17, 21, 0.4);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+
+/* scrollable area for the chat history */
+.left-scroll {
+  flex: 1 1 auto;
+  overflow: auto;
+  padding: 16px;
+}
+
+/* input dock with top divider for symmetry */
+.left-input-dock {
+  border-top: 1px solid var(--border);
+  padding: 16px;
+  background: rgba(15, 17, 21, 0.45);
+  border-bottom-left-radius: 12px;
+  border-bottom-right-radius: 12px;
+}
+
+/* ChatWindow styles (used by ChatWindow.tsx) */
+.console-window {
+  min-height: 100px;
+}
+
+.console-line {
+  margin-bottom: 10px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.console-line.user .console-text {
+  background: rgba(84, 101, 255, 0.14);
+  border: 1px solid rgba(84, 101, 255, 0.25);
+  color: #dce1ff;
+}
+
+.console-line.ai .console-text {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--border);
+  color: var(--ink);
+}
+
+.console-prompt {
+  margin-right: 8px;
+  color: var(--ink-dim);
+}
+
+.console-text {
+  display: inline-block;
+  padding: 10px 12px;
+  border-radius: 10px;
+}
+
+/* Make the ChatInput row comfortable inside the dock */
+.chat-input-container .send-btn {
+  height: 40px;
+  padding: 0 16px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, .08);
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.chat-input-container .send-btn:hover {
+  background: rgba(255, 255, 255, .12);
+}

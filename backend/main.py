@@ -3,7 +3,10 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from nebula.api.routers.compat import router as compat_router
 
+from nebula.api.routers import analyze
+
 app = FastAPI(title="NEBULABrain API", version="0.1")
+app.include_router(analyze.router)
 
 # CORS for local dev (adjust in prod)
 app.add_middleware(
@@ -17,8 +20,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ⚠️ Do NOT add a "/api" prefix here.
-# The frontend Vite proxy maps "/api/*" -> "/*" on the backend.
 app.include_router(compat_router, tags=["compat"])
 
 @app.get("/")

@@ -108,11 +108,12 @@ export default function App() {
             </section>
           )}
 
-          {view === "analysis" && (
-            <section className="panel p-8">
-              <ResultsPanel outputs={[]} />
-            </section>
-          )}
+          {view === "analysis" && summary && (
+  <section className="panel p-8">
+    <ResultsPanel summary={summary} apiBase="http://127.0.0.1:8000" />
+  </section>
+)}
+
         </div>
       </main>
     </div>
