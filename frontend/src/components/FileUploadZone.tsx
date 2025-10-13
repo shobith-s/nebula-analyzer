@@ -1,17 +1,39 @@
 import React, { useCallback } from 'react';
 import { useDropzone } from 'react-dropzone';
 import Papa from 'papaparse';
+import type { ProfileSummary } from '../types';
 
 interface FileUploadZoneProps {
+  /** Existing: raw rows/headers handoff (kept for backward compatibility) */
   onFileParsed: (data: string[][], headers: string[], fileName: string) => void;
+
+  /** NEW (optional): if provided, we will POST to backend and return a computed ProfileSummary */
+  onProfileReady?: (profile: ProfileSummary) => void;
+
+  /** Optional: show errors to user */
   onError?: (msg: string) => void;
+
+  /** Optional: max size (MB) */
   maxSizeMB?: number;
+
+  /** Optional: toggle backend call for profiling (default: true if onProfileReady is provided) */
+  useBackendProfile?: boolean;
+
+  /** Optional: endpoint to POST { filename, tabular_data:{ headers, rows } } (default: '/profile-data') */
+  profileEndpoint?: string;
+
+  /** Optional: extra fetch options (e.g., credentials) */
+  fetchOptions?: RequestInit;
 }
 
 const FileUploadZone: React.FC<FileUploadZoneProps> = ({
   onFileParsed,
+  onProfileReady,
   onError,
   maxSizeMB = 20,
+  useBackendProfile,
+  profileEndpoint = '/profile-data',
+  fetchOptions,
 }) => {
   const onDrop = useCallback(
     (acceptedFiles: File[]) => {
@@ -27,7 +49,7 @@ const FileUploadZone: React.FC<FileUploadZoneProps> = ({
       Papa.parse(file, {
         header: true,
         skipEmptyLines: true,
-        complete: (result) => {
+        complete: async (result) => {
           try {
             const headers = (result.meta.fields as string[]) || [];
             const rowsObj = result.data as Record<string, string>[];
@@ -37,10 +59,47 @@ const FileUploadZone: React.FC<FileUploadZoneProps> = ({
               return;
             }
 
-            // Convert objects → array rows in the same column order as headers
+            // Convert objects → array rows in same column order as headers
             const rows = rowsObj.map((r) => headers.map((h) => String(r[h] ?? '')));
 
+            // 1) Always keep your original callback working
             onFileParsed(rows, headers, file.name);
+
+            // 2) Optionally call backend to compute a ProfileSummary
+            const shouldCallBackend = onProfileReady && (useBackendProfile ?? true);
+            if (shouldCallBackend) {
+              try {
+                const resp = await fetch(profileEndpoint, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    filename: file.name,
+                    tabular_data: {
+                      headers,
+                      rows,
+                    },
+                  }),
+                  ...fetchOptions,
+                });
+
+                if (!resp.ok) {
+                  const txt = await resp.text().catch(() => '');
+                  throw new Error(
+                    `Profile API error (${resp.status}): ${txt || resp.statusText}`
+                  );
+                }
+
+                const profile = (await resp.json()) as ProfileSummary;
+                onProfileReady?.(profile);
+              } catch (apiErr: any) {
+                onError?.(
+                  `Failed to generate profile on server: ${
+                    apiErr?.message || String(apiErr)
+                  }`
+                );
+                // Fall back gracefully: parent can still proceed using raw rows if desired.
+              }
+            }
           } catch (e: any) {
             onError?.(`Failed to parse CSV: ${e?.message || e}`);
           }
@@ -50,7 +109,15 @@ const FileUploadZone: React.FC<FileUploadZoneProps> = ({
         },
       });
     },
-    [onFileParsed, onError, maxSizeMB]
+    [
+      onFileParsed,
+      onProfileReady,
+      onError,
+      maxSizeMB,
+      profileEndpoint,
+      useBackendProfile,
+      fetchOptions,
+    ]
   );
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
@@ -64,6 +131,13 @@ const FileUploadZone: React.FC<FileUploadZoneProps> = ({
       {...getRootProps()}
       className={`dropzone ${isDragActive ? 'active' : ''}`}
       aria-label="Drag & drop CSV"
+      style={{
+        border: '1px dashed rgba(255,255,255,0.15)',
+        borderRadius: 16,
+        padding: 28,
+        textAlign: 'center',
+        background: 'rgba(15,23,42,0.4)',
+      }}
     >
       <input {...getInputProps()} />
       <div style={{ pointerEvents: 'none' }}>

@@ -22,3 +22,41 @@ input,
 textarea {
   font: inherit;
 }
+
+.panel {
+  border-radius: 16px;
+  background: rgba(15, 23, 42, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+/* Headings + spacing harmony */
+h1,
+.h1,
+h2,
+.h2 {
+  letter-spacing: -0.01em;
+}
+
+/* Dropzone look (if you rely on className="dropzone") */
+.dropzone {
+  border: 1px dashed rgba(255, 255, 255, 0.12);
+  border-radius: 16px;
+  padding: 28px;
+  text-align: center;
+  background: rgba(2, 6, 23, 0.55);
+}
+
+.dropzone.active {
+  background: rgba(2, 6, 23, 0.7);
+}
+
+/* Sidebar text spacing */
+aside[aria-label="Neural Control Panel"] .p-3>.rounded-xl {
+  margin-top: 8px;
+}
+
+/* Panel heading weight */
+.panel h1,
+.panel h2 {
+  letter-spacing: -0.01em;
+}

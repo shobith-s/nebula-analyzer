@@ -1,57 +1,57 @@
-import React from 'react';
-import { motion } from 'framer-motion';
+import { ChevronsLeft } from "lucide-react";
 
-export type AIStatus = 'idle' | 'thinking' | 'success' | 'error';
-
-interface HeaderProps {
-  status: AIStatus;
-  onToggleSidebar: () => void;
-}
-
-const Header: React.FC<HeaderProps> = ({ status, onToggleSidebar }) => {
-  const statusText =
-    status === 'thinking'
-      ? 'Thinking...'
-      : status === 'success'
-      ? 'Insight Generated'
-      : status === 'error'
-      ? 'Error Occurred'
-      : 'Ready for Analysis';
-
-  const pulseVariants = {
-    pulsing: {
-      scale: [1, 1.05, 1],
-      opacity: [0.7, 1, 0.7],
-      transition: { duration: 1.5, repeat: Infinity, ease: 'easeInOut' },
-    },
-    idle: { scale: 1, opacity: 1 },
-  };
-
+export default function Header({ onToggleSidebar }: { onToggleSidebar: () => void }) {
   return (
-    <header className="header">
-      <button
-        className="icon-button"
-        aria-label="Toggle sidebar"
-        onClick={onToggleSidebar}
+    <header
+      style={{
+        position: "fixed",
+        insetInline: 0,
+        top: 0,
+        height: 64,
+        background: "rgba(15,17,23,.9)",
+        borderBottom: "1px solid rgba(255,255,255,.06)",
+        backdropFilter: "blur(6px)",
+        zIndex: 50,
+      }}
+    >
+      <div
+        style={{
+          height: "100%",
+          display: "flex",
+          alignItems: "center",
+          gap: 12,
+          paddingInline: 24,
+        }}
       >
-        <span className="hamburger" />
-      </button>
+        <button
+          onClick={onToggleSidebar}
+          aria-label="Collapse sidebar"
+          style={{
+            border: "1px solid rgba(255,255,255,.12)",
+            background: "transparent",
+            borderRadius: 12,
+            padding: 8,
+            cursor: "pointer",
+          }}
+        >
+          <ChevronsLeft style={{ width: 18, height: 18 }} />
+        </button>
 
-      <div className="brand">
-        <span className="brand-name">NEBULA</span>
-        <span className="brand-suffix">Analyzer</span>
-        <span className="brand-version">v0.1</span>
+        <div style={{ marginLeft: "auto" }}>
+          <span
+            style={{
+              fontSize: 12,
+              padding: "6px 12px",
+              borderRadius: 999,
+              border: "1px solid rgba(16,185,129,.35)",
+              background: "rgba(16,185,129,.12)",
+              color: "#19c28a",
+            }}
+          >
+            Ready for Analysis
+          </span>
+        </div>
       </div>
-
-      <motion.div
-        className={`status-indicator ${status}`}
-        variants={pulseVariants}
-        animate={status === 'thinking' ? 'pulsing' : 'idle'}
-      >
-        {statusText}
-      </motion.div>
     </header>
   );
-};
-
-export default Header;
+}

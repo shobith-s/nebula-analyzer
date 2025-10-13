@@ -11,7 +11,9 @@ type Props = {
 };
 
 const num = (v: number | null | undefined, digits = 0) =>
-  v === null || v === undefined || Number.isNaN(v) ? "—" : v.toLocaleString(undefined, { maximumFractionDigits: digits });
+  v === null || v === undefined || Number.isNaN(v)
+    ? "—"
+    : v.toLocaleString(undefined, { maximumFractionDigits: digits });
 
 const DataHealthReport: React.FC<Props> = ({ summary, onProceed }) => {
   const cols = summary.columns ?? []; // columns?: Array<{ name, dtype, missing, outliers }>
@@ -34,13 +36,21 @@ const DataHealthReport: React.FC<Props> = ({ summary, onProceed }) => {
 
   return (
     <div className="profile-wrap">
-      <h2 className="h2">
-        Data Health Report for <span className="file-pill">{summary.filename ?? "dataset.csv"}</span>
-      </h2>
+      {/* CHANGED: Header block with action on the right */}
+      <div className="header-row" style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 12 }}>
+        <h2 className="h2" style={{ marginBottom: 0 }}>
+          Data Health Report for{" "}
+          <span className="file-pill">{summary.filename ?? "dataset.csv"}</span>
+        </h2>
+        <button onClick={onProceed} className="btn-primary">
+          Proceed to Analysis
+        </button>
+      </div>
 
-      <div className="profile-grid">
+      {/* CHANGED: Desktop 12-col grid with 8/4 split */}
+      <div className="profile-grid grid-cols-12 gap-6" style={{ display: "grid", gridTemplateColumns: "repeat(12, minmax(0, 1fr))", gap: "1.5rem", marginTop: "1.5rem" }}>
         {/* Left: per-column anomalies only */}
-        <div className="card glass holo-border">
+        <div className="card glass holo-border overflow-hidden col-span-12 md:col-span-8" style={{ gridColumn: "span 12 / span 12" }}>
           <div className="table-wrap">
             <table className="nebula-table compact">
               <thead>
@@ -78,13 +88,16 @@ const DataHealthReport: React.FC<Props> = ({ summary, onProceed }) => {
         </div>
 
         {/* Right: dataset stats + suggestions */}
-        <div className="side-stack">
+        {/* CHANGED: Right rail becomes a vertical stack within the 4-col column */}
+        <div className="col-span-12 md:col-span-4 side-stack" style={{ gridColumn: "span 12 / span 12" }}>
           <div className="card glass holo-border">
             <h3 className="card-title">Dataset Stats</h3>
             <ul className="kv-list">
               <li>
                 <span>Data Quality Score</span>
-                <strong className="num">{quality === undefined ? "—" : quality.toFixed(1)}</strong>
+                <strong className="num">
+                  {quality === undefined ? "—" : quality.toFixed(1)}
+                </strong>
               </li>
               <li>
                 <span>Total Rows</span>
@@ -97,13 +110,17 @@ const DataHealthReport: React.FC<Props> = ({ summary, onProceed }) => {
               {missingTotal !== undefined && (
                 <li>
                   <span>Missing Values</span>
-                  <strong className={`num ${missingTotal > 0 ? "warn" : ""}`}>{num(missingTotal)}</strong>
+                  <strong className={`num ${missingTotal > 0 ? "warn" : ""}`}>
+                    {num(missingTotal)}
+                  </strong>
                 </li>
               )}
               {dupTotal !== undefined && (
                 <li>
                   <span>Duplicate Rows</span>
-                  <strong className={`num ${dupTotal > 0 ? "warn" : ""}`}>{num(dupTotal)}</strong>
+                  <strong className={`num ${dupTotal > 0 ? "warn" : ""}`}>
+                    {num(dupTotal)}
+                  </strong>
                 </li>
               )}
             </ul>
@@ -118,14 +135,7 @@ const DataHealthReport: React.FC<Props> = ({ summary, onProceed }) => {
             </ul>
           </div>
 
-          <div className="card glass holo-border">
-            <div className="actions-row">
-              <span className="muted">Looks good? Continue to the analysis workspace.</span>
-              <button onClick={onProceed} className="btn-primary">
-                Proceed to Analysis
-              </button>
-            </div>
-          </div>
+          {/* CHANGED: removed bottom actions card; button is now in the header */}
         </div>
       </div>
     </div>
