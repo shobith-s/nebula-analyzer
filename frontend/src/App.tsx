@@ -4,8 +4,10 @@ import Sidebar from "./components/Sidebar";
 import FileUploadZone from "./components/FileUploadZone";
 import DataHealthReport from "./components/DataHealthReport";
 import ResultsPanel from "./components/ResultsPanel";
-import type { ProfileSummary } from "./types";
+import type { ProfileSummary, TabularPreview } from "./types";
 import "./App.css";
+
+
 // ADD: fallback builder
 const buildFallbackProfile = (
   rows: string[][],
@@ -39,6 +41,7 @@ export default function App() {
   const [collapsed, setCollapsed] = useState(false);
   const [view, setView] = useState<View>("upload");
   const [summary, setSummary] = useState<ProfileSummary | null>(null);
+  const [preview, setPreview] = useState<TabularPreview | null>(null);
 
   // Called after CSV is parsed + (optionally) profiled by backend
   const handleProfileReady = (profile: ProfileSummary) => {
@@ -72,32 +75,25 @@ export default function App() {
 
               {/* IMPORTANT: ensure FileUploadZone calls onProfileReady(profile) */}
               <FileUploadZone
-  // If the server profile doesn’t arrive, this fallback guarantees navigation to Report
   onFileParsed={(rows, headers, fileName) => {
     const fallback = buildFallbackProfile(rows, headers, fileName);
     setSummary(fallback);
+    setPreview({ headers, rows: rows.slice(0, 2000) }); // cap to keep payload light
     setView("report");
   }}
-
-  // When backend profile arrives, we prefer that and still go to Report
-  onProfileReady={(profile) => {
+  onProfileReady={(profile, rowsAndHeaders) => { // <-- see FileUploadZone change below
     setSummary(profile);
+    if (rowsAndHeaders) {
+      const { rows, headers } = rowsAndHeaders;
+      setPreview({ headers, rows: rows.slice(0, 2000) });
+    }
     setView("report");
   }}
-
-  // Show/log errors but DO NOT block navigation
-  onError={(m) => {
-    console.error(m);
-    // no-op; onFileParsed already constructed a fallback summary above
-  }}
-
-  // IMPORTANT: point to your FastAPI host (Vite is :5173, FastAPI often :8000)
-  // If your API is at http://127.0.0.1:8000, set that here:
+  onError={(m) => console.error(m)}
   profileEndpoint="http://127.0.0.1:8000/profile-data"
-
-  // Try server profile; if it fails we still fall back via onFileParsed
   useBackendProfile={true}
 />
+
 
             </section>
           )}
@@ -110,9 +106,10 @@ export default function App() {
 
           {view === "analysis" && summary && (
   <section className="panel p-8">
-    <ResultsPanel summary={summary} apiBase="http://127.0.0.1:8000" />
+    <ResultsPanel summary={summary} apiBase="http://127.0.0.1:8000" preview={preview ?? undefined} />
   </section>
 )}
+
 
         </div>
       </main>

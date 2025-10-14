@@ -4,25 +4,12 @@ import Papa from 'papaparse';
 import type { ProfileSummary } from '../types';
 
 interface FileUploadZoneProps {
-  /** Existing: raw rows/headers handoff (kept for backward compatibility) */
   onFileParsed: (data: string[][], headers: string[], fileName: string) => void;
-
-  /** NEW (optional): if provided, we will POST to backend and return a computed ProfileSummary */
-  onProfileReady?: (profile: ProfileSummary) => void;
-
-  /** Optional: show errors to user */
+  onProfileReady?: (profile: ProfileSummary, rowsAndHeaders?: { rows: string[][]; headers: string[] }) => void;
   onError?: (msg: string) => void;
-
-  /** Optional: max size (MB) */
   maxSizeMB?: number;
-
-  /** Optional: toggle backend call for profiling (default: true if onProfileReady is provided) */
-  useBackendProfile?: boolean;
-
-  /** Optional: endpoint to POST { filename, tabular_data:{ headers, rows } } (default: '/profile-data') */
   profileEndpoint?: string;
-
-  /** Optional: extra fetch options (e.g., credentials) */
+  useBackendProfile?: boolean;
   fetchOptions?: RequestInit;
 }
 
@@ -49,7 +36,7 @@ const FileUploadZone: React.FC<FileUploadZoneProps> = ({
       Papa.parse(file, {
         header: true,
         skipEmptyLines: true,
-        complete: async (result) => {
+        complete: (result) => {
           try {
             const headers = (result.meta.fields as string[]) || [];
             const rowsObj = result.data as Record<string, string>[];
@@ -59,46 +46,25 @@ const FileUploadZone: React.FC<FileUploadZoneProps> = ({
               return;
             }
 
-            // Convert objects → array rows in same column order as headers
             const rows = rowsObj.map((r) => headers.map((h) => String(r[h] ?? '')));
 
             // 1) Always keep your original callback working
             onFileParsed(rows, headers, file.name);
 
             // 2) Optionally call backend to compute a ProfileSummary
-            const shouldCallBackend = onProfileReady && (useBackendProfile ?? true);
-            if (shouldCallBackend) {
-              try {
-                const resp = await fetch(profileEndpoint, {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({
-                    filename: file.name,
-                    tabular_data: {
-                      headers,
-                      rows,
-                    },
-                  }),
-                  ...fetchOptions,
-                });
-
-                if (!resp.ok) {
-                  const txt = await resp.text().catch(() => '');
-                  throw new Error(
-                    `Profile API error (${resp.status}): ${txt || resp.statusText}`
-                  );
-                }
-
-                const profile = (await resp.json()) as ProfileSummary;
-                onProfileReady?.(profile);
-              } catch (apiErr: any) {
-                onError?.(
-                  `Failed to generate profile on server: ${
-                    apiErr?.message || String(apiErr)
-                  }`
-                );
-                // Fall back gracefully: parent can still proceed using raw rows if desired.
-              }
+            if (useBackendProfile && onProfileReady && profileEndpoint) {
+              fetch(profileEndpoint, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  filename: file.name,
+                  tabular_data: { headers, rows },
+                }),
+                ...fetchOptions,
+              })
+                .then((r) => r.json())
+                .then((profile) => onProfileReady(profile, { rows, headers }))
+                .catch((e) => onError?.(`Failed to profile: ${String(e)}`));
             }
           } catch (e: any) {
             onError?.(`Failed to parse CSV: ${e?.message || e}`);

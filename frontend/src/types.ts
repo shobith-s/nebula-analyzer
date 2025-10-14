@@ -30,3 +30,11 @@ export interface ProfileSummary {
   suggestions?: string[];
   anomalies?: Record<string, any>;
 }
+
+/** Small slice of data sent to /analyze so backend can compute charts */
+export interface TabularPreview {
+  headers: string[];
+  rows: (string | number | null)[][]; // trimmed rows, stringified by Papa.parse
+}
+
+export type ModelChoice = 'gemini' | 'local';
